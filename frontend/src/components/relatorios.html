@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatórios - Meu Financeiro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4f46e5',
+                        secondary: '#10b981',
+                        expense: '#ef4444',
+                        income: '#10b981',
+                        dark: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        .report-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Sidebar -->
+        <div class="fixed inset-y-0 left-0 w-64 bg-white shadow-lg hidden md:block">
+            <div class="flex items-center justify-center h-16 px-4 bg-primary">
+                <h1 class="text-white font-bold text-xl">Meu Financeiro</h1>
+            </div>
+            <div class="p-4 border-b flex items-center space-x-3">
+                <img class="w-10 h-10 rounded-full" src="https://randomuser.me/api/portraits/men/32.jpg" alt="User">
+                <div>
+                    <p class="font-medium">João Silva</p>
+                    <p class="text-xs text-gray-500">joao@email.com</p>
+                </div>
+            </div>
+            <nav class="mt-4">
+                <a href="#" class="flex items-center px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-primary">
+                    <i class="fas fa-chart-pie mr-3"></i>
+                    <span>Visão Geral</span>
+                </a>
+                <a href="#" class="flex items-center px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-primary">
+                    <i class="fas fa-exchange-alt mr-3"></i>
+                    <span>Transações</span>
+                </a>
+                <a href="#" class="flex items-center px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-primary">
+                    <i class="fas fa-wallet mr-3"></i>
+                    <span>Contas</span>
+                </a>
+                <a href="#" class="flex items-center px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-primary">
+                    <i class="fas fa-tags mr-3"></i>
+                    <span>Categorias</span>
+                </a>
+                <a href="#" class="flex items-center px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-primary">
+                    <i class="fas fa-bullseye mr-3"></i>
+                    <span>Metas</span>
+                </a>
+                <a href="#" class="flex items-center px-6 py-3 text-primary bg-indigo-50 border-r-4 border-primary">
+                    <i class="fas fa-chart-line mr-3"></i>
+                    <span>Relatórios</span>
+                </a>
+            </nav>
+            <div class="absolute bottom-0 w-full p-4 border-t">
+                <a href="#" class="flex items-center px-4 py-2 text-gray-600 hover:bg-indigo-50 hover:text-primary rounded-lg">
+                    <i class="fas fa-cog mr-3"></i>
+                    <span>Configurações</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Mobile header -->
+        <div class="md:hidden flex items-center justify-between h-16 px-4 bg-primary text-white">
+            <button id="menuBtn" class="text-white focus:outline-none">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 class="font-bold text-xl">Relatórios</h1>
+            <div class="w-6"></div>
+        </div>
+
+        <!-- Mobile sidebar -->
+        <div id="mobileSidebar" class="fixed inset-0 z-50 bg-gray-900 bg-opacity-50 hidden">
+            <div class="bg-white w-64 h-full transform transition-transform duration-300 ease-in-out -translate-x-full">
+                <div class="flex items-center justify-between h-16 px-4 bg-primary text-white">
+                    <span class="font-bold">Menu</span>
+                    <button id="closeMenuBtn" class="text-white focus:outline-none">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-4 border-b flex items-center space-x-3">
+                    <img class="w-10 h-10 rounded-full" src="https://randomuser.me/api/portraits/men/32.jpg" alt="User">
+                    <div>
+                        <p class="font-medium">João Silva</p>
+                        <p class="text-xs text-gray-500">joao@email.com</p>
+                    </div>
+                </div>
+                <nav class="mt-4">
+                    <a href="#" class="flex items-center px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-primary">
+                        <i class="fas fa-chart-pie mr-3"></i>
+                        <span>Visão Geral</span>
+                    </a>
+                    <a href="#" class="flex items-center px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-primary">
+                        <i class="fas fa-exchange-alt mr-3"></i>
+                        <span>Transações</span>
+                    </a>
+                    <a href="#" class="flex items-center px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-primary">
+                        <i class="fas fa-wallet mr-3"></i>
+                        <span>Contas</span>
+                    </a>
+                    <a href="#" class="flex items-center px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-primary">
+                        <i class="fas fa-tags mr-3"></i>
+                        <span>Categorias</span>
+                    </a>
+                    <a href="#" class="flex items-center px-6 py-3 text-gray-600 hover:bg-indigo-50 hover:text-primary">
+                        <i class="fas fa-bullseye mr-3"></i>
+                        <span>Metas</span>
+                    </a>
+                    <a href="#" class="flex items-center px-6 py-3 text-primary bg-indigo-50">
+                        <i class="fas fa-chart-line mr-3"></i>
+                        <span>Relatórios</span>
+                    </a>
+                </nav>
+                <div class="absolute bottom-0 w-full p-4 border-t">
+                    <a href="#" class="flex items-center px-4 py-2 text-gray-600 hover:bg-indigo-50 hover:text-primary rounded-lg">
+                        <i class="fas fa-cog mr-3"></i>
+                        <span>Configurações</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <div class="md:ml-64">
+            <div class="p-6">
+                <!-- Header -->
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800">Relatórios Financeiros</h2>
+                        <p class="text-gray-600">Análise detalhada de suas finanças</p>
+                    </div>
+                    <div class="mt-4 md:mt-0 flex space-x-3">
+                        <button class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg flex items-center hover:bg-gray-50">
+                            <i class="fas fa-download mr-2"></i>
+                            <span>Exportar</span>
+                        </button>
+                        <button class="bg-primary hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center">
+                            <i class="fas fa-filter mr-2"></i>
+                            <span>Filtrar</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Date range selector -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+                    <div class="flex flex-col md:flex-row items-center justify-between">
+                        <div class="flex items-center mb-4 md:mb-0">
+                            <h3 class="font-medium mr-3">Período:</h3>
+                            <select class="border border-gray-300 rounded-lg px-3 py-1 bg-gray-50 focus:ring-primary focus:border-primary">
+                                <option>Últimos 7 dias</option>
+                                <option>Últimos 30 dias</option>
+                                <option selected>Este mês</option>
+                                <option>Mês passado</option>
+                                <option>Este trimestre</option>
+                                <option>Este ano</option>
+                                <option>Personalizado</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button class="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <span class="font-medium">Junho 2023</span>
+                            <button class="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="report-card bg-white border border-gray-200 rounded-xl p-4 transition-all duration-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">Receitas</p>
+                                <h3 class="text-2xl font-bold text-green-600">R$ 8.450</h3>
+                                <p class="text-xs text-gray-500 mt-1">+12% em relação ao mês passado</p>
+                            </div>
+                            <div class="bg-green-100 p-3 rounded-lg text-green-600">
+                                <i class="fas fa-arrow-up"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="report-card bg-white border border-gray-200 rounded-xl p-4 transition-all duration-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">Despesas</p>
+                                <h3 class="text-2xl font-bold text-red-600">R$ 5.320</h3>
+                                <p class="text-xs text-gray-500 mt-1">+5% em relação ao mês passado</p>
+                            </div>
+                            <div class="bg-red-100 p-3 rounded-lg text-red-600">
+                                <i class="fas fa-arrow-up"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="report-card bg-white border border-gray-200 rounded-xl p-4 transition-all duration-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500">Saldo</p>
+                                <h3 class="text-2xl font-bold text-primary">R$ 3.130</h3>
+                                <p class="text-xs text-gray-500 mt-1">+25% em relação ao mês passado</p>
+                            </div>
+                            <div class="bg-indigo-100 p-3 rounded-lg text-primary">
+                                <i class="fas fa-arrow-up"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts section -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Income vs Expenses chart -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-semibold text-gray-800">Receitas vs Despesas</h3>
+                            <div class="flex space-x-2">
+                                <button class="px-2 py-1 text-xs bg-indigo-50 text-primary rounded hover:bg-indigo-100">Mensal</button>
+                                <button class="px-2 py-1 text-xs bg-white text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Anual</button>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="incomeExpenseChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Expenses by category chart -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-semibold text-gray-800">Despesas por Categoria</h3>
+                            <button class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="expenseCategoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed reports -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+                    <!-- Table header -->
+                    <div class="px-6 py-4 border-b flex flex-col md:flex-row justify-between items-start md:items-center">
+                        <h3 class="font-semibold text-gray-800 mb-2 md:mb-0">Transações Detalhadas</h3>
+                        <div class="flex space-x-2">
+                            <select class="border border-gray-300 rounded-lg px-3 py-1 bg-gray-50 text-sm focus:ring-primary focus:border-primary">
+                                <option>Todas as categorias</option>
+                                <option>Alimentação</option>
+                                <option>Moradia</option>
+                                <option>Transporte</option>
+                                <option>Lazer</option>
+                                <option>Saúde</option>
+                            </select>
+                            <select class="border border-gray-300 rounded-lg px-3 py-1 bg-gray-50 text-sm focus:ring-primary focus:border-primary">
+                                <option>Todos os tipos</option>
+                                <option>Receitas</option>
+                                <option>Despesas</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Table content -->
+                    <div class="divide-y divide-gray-100 overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conta</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <!-- Transaction 1 -->
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">15/06/2023</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="bg-green-100 p-2 rounded-lg mr-3 text-green-600">
+                                                <i class="fas fa-money-bill-wave text-sm"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium text-gray-900">Salário</div>
+                                                <div class="text-xs text-gray-500">Empresa XYZ</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Rendimento</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Banco ABC</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">R$ 5.000,00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <button class="text-gray-400 hover:text-gray-600 mr-2">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-gray-400 hover:text-gray-600">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Transaction 2 -->
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">12/06/2023</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="bg-red-100 p-2 rounded-lg mr-3 text-red-600">
+                                                <i class="fas fa-home text-sm"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium text-gray-900">Aluguel</div>
+                                                <div class="text-xs text-gray-500">Apartamento</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">Moradia</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Banco ABC</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">- R$ 1.500,00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <button class="text-gray-400 hover:text-gray-600 mr-2">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-gray-400 hover:text-gray-600">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Transaction 3 -->
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">10/06/2023</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="bg-red-100 p-2 rounded-lg mr-3 text-red-600">
+                                                <i class="fas fa-utensils text-sm"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium text-gray-900">Supermercado</div>
+                                                <div class="text-xs text-gray-500">Mercado Central</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">Alimentação</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Cartão de Crédito</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">- R$ 450,00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <button class="text-gray-400 hover:text-gray-600 mr-2">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-gray-400 hover:text-gray-600">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Transaction 4 -->
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">08/06/2023</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="bg-green-100 p-2 rounded-lg mr-3 text-green-600">
+                                                <i class="fas fa-piggy-bank text-sm"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium text-gray-900">Rendimentos</div>
+                                                <div class="text-xs text-gray-500">Investimentos</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Investimento</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Corretora XPTO</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">R$ 320,00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <button class="text-gray-400 hover:text-gray-600 mr-2">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-gray-400 hover:text-gray-600">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Transaction 5 -->
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">05/06/2023</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="bg-red-100 p-2 rounded-lg mr-3 text-red-600">
+                                                <i class="fas fa-car text-sm"></i>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium text-gray-900">Combustível</div>
+                                                <div class="text-xs text-gray-500">Posto Shell</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">Transporte</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Cartão de Crédito</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">- R$ 180,00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <button class="text-gray-400 hover:text-gray-600 mr-2">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="text-gray-400 hover:text-gray-600">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Table footer -->
+                    <div class="px-6 py-4 border-t flex flex-col md:flex-row justify-between items-center">
+                        <div class="text-sm text-gray-500 mb-2 md:mb-0">
+                            Mostrando <span class="font-medium">1</span> a <span class="font-medium">5</span> de <span class="font-medium">24</span> transações
+                        </div>
+                        <div class="flex space-x-1">
+                            <button class="px-3 py-1 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button class="px-3 py-1 border border-primary rounded-lg text-white bg-primary hover:bg-indigo-700">1</button>
+                            <button class="px-3 py-1 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">2</button>
+                            <button class="px-3 py-1 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">3</button>
+                            <button class="px-3 py-1 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Monthly trends -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-semibold text-gray-800">Tendência Mensal</h3>
+                        <div class="flex space-x-2">
+                            <button class="px-2 py-1 text-xs bg-indigo-50 text-primary rounded hover:bg-indigo-100">Receitas</button>
+                            <button class="px-2 py-1 text-xs bg-white text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Despesas</button>
+                            <button class="px-2 py-1 text-xs bg-white text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Saldo</button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="monthlyTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Budget vs Actual -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Budget status -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-semibold text-gray-800">Status do Orçamento</h3>
+                            <button class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                        </div>
+                        <div class="space-y-4">
+                            <!-- Budget item 1 -->
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-gray-600">Alimentação</span>
+                                    <span class="font-medium">R$ 450 / R$ 600</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-green-500 rounded-full h-2" style="width: 75%"></div>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">Restante: R$ 150 (25%)</div>
+                            </div>
+                            
+                            <!-- Budget item 2 -->
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-gray-600">Transporte</span>
+                                    <span class="font-medium">R$ 380 / R$ 400</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-yellow-500 rounded-full h-2" style="width: 95%"></div>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">Restante: R$ 20 (5%)</div>
+                            </div>
+                            
+                            <!-- Budget item 3 -->
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-gray-600">Lazer</span>
+                                    <span class="font-medium">R$ 250 / R$ 300</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-green-500 rounded-full h-2" style="width: 83%"></div>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">Restante: R$ 50 (17%)</div>
+                            </div>
+                            
+                            <!-- Budget item 4 -->
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-gray-600">Moradia</span>
+                                    <span class="font-medium">R$ 1.500 / R$ 1.500</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-red-500 rounded-full h-2" style="width: 100%"></div>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">Restante: R$ 0 (0%)</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Savings rate -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-semibold text-gray-800">Taxa de Poupança</h3>
+                            <button class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                        </div>
+                        <div class="flex flex-col items-center justify-center h-64">
+                            <div class="relative w-40 h-40 mb-4">
+                                <canvas id="savingsRateChart"></canvas>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <div class="text-center">
+                                        <div class="text-2xl font-bold text-primary">37%</div>
+                                        <div class="text-xs text-gray-500">da renda</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-sm text-gray-600 text-center">
+                                Você está poupando <span class="font-medium text-primary">37%</span> da sua renda este mês.
+                                <div class="text-xs text-gray-500 mt-1">Meta: 30%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mobile menu toggle
+        const menuBtn = document.getElementById('menuBtn');
+        const closeMenuBtn = document.getElementById('closeMenuBtn');
+        const mobileSidebar = document.getElementById('mobileSidebar');
+        
+        menuBtn.addEventListener('click', () => {
+            mobileSidebar.classList.remove('hidden');
+            setTimeout(() => {
+                mobileSidebar.querySelector('div').classList.remove('-translate-x-full');
+            }, 50);
+        });
+        
+        closeMenuBtn.addEventListener('click', () => {
+            mobileSidebar.querySelector('div').classList.add('-translate-x-full');
+            setTimeout(() => {
+                mobileSidebar.classList.add('hidden');
+            }, 300);
+        });
+
+        // Initialize charts
+        document.addEventListener('DOMContentLoaded', function() {
+            // Income vs Expenses chart
+            const incomeExpenseCtx = document.getElementById('incomeExpenseChart').getContext('2d');
+            const incomeExpenseChart = new Chart(incomeExpenseCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+                    datasets: [
+                        {
+                            label: 'Receitas',
+                            data: [6500, 5900, 8000, 8100, 8600, 8450],
+                            backgroundColor: '#10b981',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Despesas',
+                            data: [4800, 5200, 6000, 5800, 6200, 5320],
+                            backgroundColor: '#ef4444',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                drawBorder: false
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR');
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Expense by category chart
+            const expenseCategoryCtx = document.getElementById('expenseCategoryChart').getContext('2d');
+            const expenseCategoryChart = new Chart(expenseCategoryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Moradia', 'Alimentação', 'Transporte', 'Lazer', 'Saúde', 'Outros'],
+                    datasets: [{
+                        data: [1500, 850, 480, 320, 220, 1150],
+                        backgroundColor: [
+                            '#ef4444',
+                            '#f97316',
+                            '#f59e0b',
+                            '#10b981',
+                            '#3b82f6',
+                            '#8b5cf6'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: R$ ${value.toLocaleString('pt-BR')} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Monthly trend chart
+            const monthlyTrendCtx = document.getElementById('monthlyTrendChart').getContext('2d');
+            const monthlyTrendChart = new Chart(monthlyTrendCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+                    datasets: [{
+                        label: 'Receitas',
+                        data: [6500, 5900, 8000, 8100, 8600, 8450],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            grid: {
+                                drawBorder: false
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR');
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Savings rate chart
+            const savingsRateCtx = document.getElementById('savingsRateChart').getContext('2d');
+            const savingsRateChart = new Chart(savingsRateCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Poupança', 'Gastos'],
+                    datasets: [{
+                        data: [37, 63],
+                        backgroundColor: [
+                            '#4f46e5',
+                            '#e5e7eb'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '80%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        });
+
+        // Tab switching for monthly trend chart
+        document.querySelectorAll('#monthlyTrendChart').nextElementSibling.querySelectorAll('button').forEach((btn, index) => {
+            btn.addEventListener('click', () => {
+                const monthlyTrendChart = Chart.getChart('monthlyTrendChart');
+                
+                // Update dataset based on selected tab
+                if (index === 0) { // Receitas
+                    monthlyTrendChart.data.datasets = [{
+                        label: 'Receitas',
+                        data: [6500, 5900, 8000, 8100, 8600, 8450],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }];
+                } else if (index === 1) { // Despesas
+                    monthlyTrendChart.data.datasets = [{
+                        label: 'Despesas',
+                        data: [4800, 5200, 6000, 5800, 6200, 5320],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }];
+                } else { // Saldo
+                    monthlyTrendChart.data.datasets = [{
+                        label: 'Saldo',
+                        data: [1700, 700, 2000, 2300, 2400, 3130],
+                        borderColor: '#4f46e5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.05)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }];
+                }
+                
+                monthlyTrendChart.update();
+                
+                // Update button styles
+                const buttons = document.querySelectorAll('#monthlyTrendChart').nextElementSibling.querySelectorAll('button');
+                buttons.forEach((b, i) => {
+                    if (i === index) {
+                        b.classList.remove('bg-white', 'text-gray-600', 'border-gray-200');
+                        b.classList.add('bg-indigo-50', 'text-primary');
+                    } else {
+                        b.classList.remove('bg-indigo-50', 'text-primary');
+                        b.classList.add('bg-white', 'text-gray-600', 'border-gray-200');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
