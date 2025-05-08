@@ -12,9 +12,11 @@ app.use(express.urlencoded({ extended: true }));
 const transactionRoutes = require('./routes/transactionRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const budgetRoutes = require('./routes/budgetRoutes');
+const goalRoutes = require('./routes/goalRoutes');
 const accountRoutes = require('./routes/accountRoutes');
-// Importar as rotas de contribuição
 const contributionRoutes = require('./routes/ContributionsRoutes');
+const authRoutes = require('./routes/authRoutes'); // Adicionar importação das rotas de autenticação
+const settingsRoutes = require('./routes/settingsRoutes'); // Adicionar importação das rotas de configurações
 
 // Sync sequelize models with database
 (async () => {
@@ -26,12 +28,16 @@ const contributionRoutes = require('./routes/ContributionsRoutes');
   }
 })();
 
-// Routes
+// Rotas de autenticação (adicionar antes das outras rotas)
+app.use('/api/auth', authRoutes);
+app.use('/api/settings', settingsRoutes);
+
+// Outras rotas
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/budgets', budgetRoutes);
+app.use('/api/goals', goalRoutes);
 app.use('/api/accounts', accountRoutes);
-// Adicionar as rotas de contribuição
 app.use('/api/contributions', contributionRoutes);
 
 // Rota básica para teste

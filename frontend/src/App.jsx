@@ -1,45 +1,70 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Switch, Redirect } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import Transactions from './components/Transactions';
 import Accounts from './components/Accounts';
-import Budgets from './components/Budgets';
+import Goals from './components/Goal';
 import Categories from './components/Categories';
 import Reports from './components/Reports';
+import Budget from './components/Budget';
+import Settings from './components/Settings';
+import Login from './components/auth/Login';
+import Register from './components/auth/Register';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import './styles/tailwind.css';
 
-// Configuração do Tailwind
-const configScript = document.createElement('script');
-configScript.innerHTML = `
-  window.tailwind = window.tailwind || {};
-  window.tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          primary: '#4f46e5',
-          secondary: '#10b981',
-          expense: '#ef4444',
-          income: '#10b981',
-          dark: '#1e293b',
+// Componente para proteger rotas
+const PrivateRoute = ({ component: Component, ...rest }) => {
+  const { currentUser, loading } = useAuth();
+  
+  return (
+    <Route
+      {...rest}
+      render={(props) => {
+        if (loading) {
+          return (
+            <div className="flex justify-center items-center h-screen">
+              <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          );
         }
-      }
-    }
-  };
-`;
-document.head.appendChild(configScript);
+        
+        return currentUser ? (
+          <Component {...props} />
+        ) : (
+          <Redirect to="/login" />
+        );
+      }}
+    />
+  );
+};
 
 function App() {
   return (
-    <Router>
-      <Switch>
-        <Route exact path="/" component={Dashboard} />
-        <Route path="/transactions" component={Transactions} />
-        <Route path="/accounts" component={Accounts} />
-        <Route path="/budgets" component={Budgets} />
-        <Route path="/categories" component={Categories} />
-        <Route path="/reports" component={Reports} />
-      </Switch>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Switch>
+          {/* Rotas públicas */}
+          <Route path="/login" component={Login} />
+          <Route path="/register" component={Register} />
+          
+          {/* Rotas privadas */}
+          <PrivateRoute exact path="/" component={Dashboard} />
+          <PrivateRoute path="/transactions" component={Transactions} />
+          <PrivateRoute path="/accounts" component={Accounts} />
+          <PrivateRoute path="/categories" component={Categories} />
+          <PrivateRoute path="/budget" component={Budget} />
+          <PrivateRoute path="/goals" component={Goals} />
+          <PrivateRoute path="/reports" component={Reports} />
+          <PrivateRoute path="/settings" component={Settings} />
+          
+          {/* Rota de fallback para página não encontrada */}
+          <Route path="*">
+            <Redirect to="/" />
+          </Route>
+        </Switch>
+      </Router>
+    </AuthProvider>
   );
 }
 

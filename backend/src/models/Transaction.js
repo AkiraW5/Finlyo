@@ -51,6 +51,15 @@ const Transaction = sequelize.define('Transaction', {
   notes: {
     type: DataTypes.TEXT,
     defaultValue: ''
+  },
+  // Adicionar campo userId para vincular ao usuário
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'users',
+      key: 'id'
+    }
   }
 }, {
   tableName: 'transactions',

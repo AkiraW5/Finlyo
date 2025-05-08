@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  getBudgets, 
-  createBudget, 
-  updateBudget, 
-  deleteBudget, 
+  getGoals,           // Substituir getBudgets 
+  createGoal,         // Substituir createBudget
+  updateGoal,         // Substituir updateBudget
+  deleteGoal,         // Substituir deleteBudget
   getTransactions, 
   getAccounts, 
   getContributions, 
-  createContribution 
+  createContribution, 
+  deleteContribution
 } from '../services/api';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
@@ -56,32 +57,32 @@ const Goals = () => {
     try {
       setLoading(true);
       
-      const budgetsData = await getBudgets();
+      const goalsData = await getGoals(); // Substituir getBudgets por getGoals
       const contributionsData = await getContributions();
       const accountsData = await getAccounts();
       
-      // Transformar budgets em goals com informações adicionais
-      const goalsData = budgetsData.map(budget => ({
-        ...budget,
-        limit: budget.amount,
-        saved: calculateSavedAmount(budget, contributionsData),
-        deadline: budget.endDate || getDefaultDeadline(),
-        icon: budget.icon || getDefaultIcon(budget.category),
-        color: budget.color || getDefaultColor(budget.category),
+      // Transformar os dados recebidos da API de goals
+      const processedGoals = goalsData.map(goal => ({
+        ...goal,
+        limit: goal.amount,
+        saved: calculateSavedAmount(goal, contributionsData),
+        deadline: goal.endDate || getDefaultDeadline(),
+        icon: goal.icon || getDefaultIcon(goal.category),
+        color: goal.color || getDefaultColor(goal.category),
         progress: 0
       }));
       
       // Calcular progresso para cada meta
-      goalsData.forEach(goal => {
+      processedGoals.forEach(goal => {
         goal.progress = goal.limit > 0 ? (goal.saved / goal.limit) * 100 : 0;
       });
       
-      setGoals(goalsData);
+      setGoals(processedGoals);
       setContributions(contributionsData);
       setAccounts(accountsData);
       
       // Calcular resumo
-      calculateSummary(goalsData);
+      calculateSummary(processedGoals);
       
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
@@ -218,6 +219,13 @@ const Goals = () => {
         return;
       }
       
+      // Verificar se há saldo suficiente na conta
+      const selectedAccount = accounts.find(acc => acc.id === contributionData.accountId);
+      if (parseFloat(selectedAccount?.balance) < parseFloat(contributionData.amount)) {
+        showNotification('Saldo insuficiente na conta selecionada!', 'error');
+        return;
+      }
+      
       // Criar uma contribuição usando a API dedicada
       await createContribution({
         amount: contributionData.amount,
@@ -228,14 +236,34 @@ const Goals = () => {
         method: contributionData.method || 'deposit'
       });
       
+      // Fechar modal
       setContributionModalOpen(false);
-      fetchData(); // Recarregar dados
+
+      // Atualizar o saldo da conta localmente
+      const updatedAccounts = accounts.map(account => {
+        if (account.id === contributionData.accountId) {
+          return {
+            ...account,
+            balance: parseFloat(account.balance) - parseFloat(contributionData.amount)
+          };
+        }
+        return account;
+      });
+      
+      // Atualizar o estado das contas
+      setAccounts(updatedAccounts);
+      
+      // Recarregar todos os dados
+      fetchData();
+      
+      // Mostrar notificação de sucesso
       showNotification('Contribuição adicionada com sucesso!');
     } catch (error) {
       console.error("Erro ao adicionar contribuição:", error);
       showNotification('Erro ao adicionar contribuição!', 'error');
     }
   };
+    
 
   // Obter contribuições recentes para uma meta ou todas
   const getRecentContributions = (goalId = null) => {
@@ -253,21 +281,21 @@ const Goals = () => {
   // Adicionar nova meta
   const handleAddGoal = async (goalData) => {
     try {
-      // Mapear os campos do formulário para os campos esperados pelo banco de dados
-      const budgetData = {
+      // Mapear os campos do formulário para os campos esperados pelo backend
+      const goalPayload = {
         category: goalData.category,
         amount: goalData.limit, // Mapear 'limit' para 'amount'
         period: 'monthly', // Adicionar o campo obrigatório 'period'
         startDate: goalData.deadline ? new Date() : null,
         endDate: goalData.deadline ? new Date(goalData.deadline) : null,
         notes: goalData.description || null,
-        type: 'goal' // Indicar que é uma meta
+        // Não precisamos mais adicionar type: 'goal', pois agora usamos endpoints específicos
       };
       
       if (editingGoal) {
-        await updateBudget(editingGoal.id, budgetData);
+        await updateGoal(editingGoal.id, goalPayload);
       } else {
-        await createBudget(budgetData);
+        await createGoal(goalPayload);
       }
       
       setGoalModalOpen(false);
@@ -280,22 +308,54 @@ const Goals = () => {
     }
   };
 
-  // Editar meta
-  const handleEditGoal = (goal) => {
-    setEditingGoal(goal);
-    setGoalModalOpen(true);
-  };
-
   // Excluir meta
   const handleDeleteGoal = async (id) => {
     if (window.confirm("Tem certeza que deseja excluir esta meta? Esta ação não pode ser desfeita.")) {
       try {
-        await deleteBudget(id);
+        await deleteGoal(id); // Substituir deleteBudget por deleteGoal
         fetchData(); // Recarregar dados
         showNotification('Meta excluída com sucesso!');
       } catch (error) {
         console.error("Erro ao excluir meta:", error);
         showNotification('Erro ao excluir meta!', 'error');
+      }
+    }
+  };
+
+  // Excluir contribuição
+  const handleDeleteContribution = async (contributionId, goalId) => {
+    if (window.confirm("Tem certeza que deseja excluir esta contribuição? Esta ação não pode ser desfeita.")) {
+      try {
+        await deleteContribution(contributionId);
+        
+        // Encontre a contribuição que está sendo excluída para uso posterior
+        const deletedContribution = contributions.find(c => c.id === contributionId);
+        
+        // Se a contribuição tinha uma conta associada, atualize o saldo da conta
+        if (deletedContribution && deletedContribution.accountId) {
+          const updatedAccounts = accounts.map(account => {
+            if (account.id === deletedContribution.accountId) {
+              return {
+                ...account,
+                // Devolver o valor da contribuição ao saldo da conta
+                balance: parseFloat(account.balance) + parseFloat(deletedContribution.amount)
+              };
+            }
+            return account;
+          });
+          
+          // Atualizar o estado das contas
+          setAccounts(updatedAccounts);
+        }
+        
+        // Atualizar dados após excluir
+        fetchData();
+        
+        // Mostrar notificação
+        showNotification('Contribuição excluída com sucesso!');
+      } catch (error) {
+        console.error("Erro ao excluir contribuição:", error);
+        showNotification('Erro ao excluir contribuição!', 'error');
       }
     }
   };
@@ -541,6 +601,16 @@ const Goals = () => {
                         <div className="text-right">
                           <p className="font-medium text-green-600">+ {formatCurrency(contribution.amount)}</p>
                         </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteContribution(contribution.id, contribution.budgetId);
+                          }}
+                          className="text-gray-400 hover:text-red-500 transition-colors"
+                          title="Excluir Contribuição"
+                          >
+                            <i className="fas fa-trash-alt"></i>
+                          </button>
                       </div>
                     </div>
                   );

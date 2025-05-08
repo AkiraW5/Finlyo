@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getTransactions, createTransaction, getAccounts, getCategories } from '../services/api';
+import { getTransactions, createTransaction, getAccounts, getCategories, getContributions } from '../services/api';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import MobileSidebar from './layout/MobileSidebar';
@@ -8,6 +8,8 @@ import TransactionModal from './modals/TransactionModal';
 const Transactions = () => {
   // Estados
   const [transactions, setTransactions] = useState([]);
+  const [contributions, setContributions] = useState([]); // Novo estado para contribuições
+  const [combinedTransactions, setCombinedTransactions] = useState([]); // Lista combinada
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [transactionModalOpen, setTransactionModalOpen] = useState(false);
@@ -35,26 +37,49 @@ const Transactions = () => {
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  // Buscar transações, contas e categorias
+  // Buscar transações, contas, categorias e contribuições
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [transactionsData, accountsData, categoriesData] = await Promise.all([
+        const [transactionsData, accountsData, categoriesData, contributionsData] = await Promise.all([
           getTransactions(),
           getAccounts(),
-          getCategories()
+          getCategories(),
+          getContributions()
         ]);
 
         // Garantir que todos os valores das transações sejam numéricos
         const processedTransactions = transactionsData.map(t => ({
           ...t,
-          amount: ensureNumber(t.amount || t.value) // Tenta amount primeiro, depois value
+          amount: ensureNumber(t.amount || t.value), // Tenta amount primeiro, depois value
+          isTransaction: true // Marcador para identificar como transação
         }));
 
+        // Transformar contribuições em um formato compatível com transações
+        const processedContributions = contributionsData.map(c => ({
+          id: `contrib-${c.id}`, // Prefixo para evitar conflitos de ID
+          description: c.notes || 'Contribuição para meta',
+          amount: ensureNumber(c.amount),
+          date: c.date,
+          type: 'expense', // Contribuições são consideradas despesas
+          category: 'Metas', // Categoria específica para contribuições
+          accountId: c.accountId,
+          budgetId: c.budgetId, // Campo específico de contribuições
+          isContribution: true // Marcador para identificar como contribuição
+        }));
+
+        // Armazenar dados separadamente
         setTransactions(processedTransactions);
+        setContributions(processedContributions);
         setAccounts(accountsData);
         setCategories(categoriesData);
+        
+        // Combinar transações e contribuições
+        const combined = [...processedTransactions, ...processedContributions]
+          .sort((a, b) => new Date(b.date) - new Date(a.date)); // Ordenar por data (mais recente primeiro)
+        
+        setCombinedTransactions(combined);
         
         // Calcular sumários com segurança
         const totalIncome = processedTransactions
@@ -63,10 +88,11 @@ const Transactions = () => {
           
         const totalExpense = processedTransactions
           .filter(t => t.type === 'expense')
-          .reduce((sum, t) => sum + ensureNumber(t.amount), 0);
+          .reduce((sum, t) => sum + ensureNumber(t.amount), 0) + 
+          processedContributions.reduce((sum, c) => sum + ensureNumber(c.amount), 0);
           
         setSummary({
-          count: processedTransactions.length,
+          count: combined.length,
           income: totalIncome,
           expense: totalExpense
         });
@@ -74,6 +100,8 @@ const Transactions = () => {
         console.error("Erro ao buscar dados:", error);
         // Em caso de erro, podemos definir dados vazios ou mock
         setTransactions([]);
+        setContributions([]);
+        setCombinedTransactions([]);
         setAccounts([]);
         setCategories([]);
       } finally {
@@ -95,28 +123,54 @@ const Transactions = () => {
       
       await createTransaction(preparedData);
       
-      // Recarregar transações
-      const data = await getTransactions();
+      // Recarregar transações e contribuições
+      const [transactionsData, contributionsData] = await Promise.all([
+        getTransactions(),
+        getContributions()
+      ]);
       
       // Processar os dados para garantir valores numéricos
-      const processedData = data.map(t => ({
+      const processedTransactions = transactionsData.map(t => ({
         ...t,
-        amount: ensureNumber(t.amount || t.value)
+        amount: ensureNumber(t.amount || t.value),
+        isTransaction: true
+      }));
+
+      // Transformar contribuições
+      const processedContributions = contributionsData.map(c => ({
+        id: `contrib-${c.id}`,
+        description: c.notes || 'Contribuição para meta',
+        amount: ensureNumber(c.amount),
+        date: c.date,
+        type: 'expense',
+        category: 'Metas',
+        accountId: c.accountId,
+        budgetId: c.budgetId,
+        isContribution: true
       }));
       
-      setTransactions(processedData);
+      // Atualizar estados
+      setTransactions(processedTransactions);
+      setContributions(processedContributions);
+      
+      // Combinar transações e contribuições
+      const combined = [...processedTransactions, ...processedContributions]
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+      
+      setCombinedTransactions(combined);
       
       // Atualizar sumários com segurança
-      const totalIncome = processedData
+      const totalIncome = processedTransactions
         .filter(t => t.type === 'income')
         .reduce((sum, t) => sum + ensureNumber(t.amount), 0);
         
-      const totalExpense = processedData
+      const totalExpense = processedTransactions
         .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + ensureNumber(t.amount), 0);
+        .reduce((sum, t) => sum + ensureNumber(t.amount), 0) + 
+        processedContributions.reduce((sum, c) => sum + ensureNumber(c.amount), 0);
         
       setSummary({
-        count: processedData.length,
+        count: combined.length,
         income: totalIncome,
         expense: totalExpense
       });
@@ -139,38 +193,46 @@ const Transactions = () => {
 
   // Aplicar filtros
   const applyFilters = () => {
-    // Lógica para filtrar transações
-    const filteredTransactions = transactions.filter(transaction => {
+    // Lógica para filtrar transações e contribuições combinadas
+    const filteredItems = combinedTransactions.filter(item => {
       // Filtro por tipo
-      if (filterType !== 'all' && transaction.type !== filterType) {
-        return false;
+      if (filterType !== 'all') {
+        if (item.isContribution && filterType !== 'expense') return false;
+        if (!item.isContribution && item.type !== filterType) return false;
       }
       
-      // Filtro por categoria (usando ID da categoria)
-      if (filterCategory && transaction.categoryId !== filterCategory) {
-        return false;
+      // Filtro por categoria
+      if (filterCategory) {
+        if (item.isContribution) {
+          // Para contribuições, tratamos diferente pois são uma categoria especial
+          if (filterCategory !== 'Metas') return false;
+        } else {
+          // Para transações normais, usamos o ID da categoria
+          if (item.categoryId !== filterCategory) return false;
+        }
       }
       
       // Filtro por conta (usando ID da conta)
-      if (filterAccount && transaction.accountId !== filterAccount) {
+      if (filterAccount && item.accountId !== filterAccount) {
         return false;
       }
       
       // Filtro por período
       if (filterPeriod === 'thisMonth') {
-        const date = new Date(transaction.date);
+        const date = new Date(item.date);
         const today = new Date();
         if (date.getMonth() !== today.getMonth() || date.getFullYear() !== today.getFullYear()) {
           return false;
         }
       }
-      // Adicione outros filtros de período conforme necessário
+      // Outros filtros de período podem ser adicionados aqui
       
       return true;
     });
     
-    // Aqui poderia atualizar um estado de transações filtradas
-    // Por enquanto apenas fechamos o painel de filtros
+    // Aqui você poderia atualizar um estado com as transações filtradas
+    // setCombinedFiltered(filteredItems);
+    
     setFiltersOpen(false);
   };
 
@@ -196,17 +258,45 @@ const Transactions = () => {
   // Função segura para calcular o valor das transações este mês
   const calculateMonthlyTotal = (type) => {
     try {
-      const total = transactions
-        .filter(t => {
-          const date = new Date(t.date);
-          const today = new Date();
-          return date.getMonth() === today.getMonth() && 
-                date.getFullYear() === today.getFullYear() &&
-                t.type === type;
-        })
-        .reduce((sum, t) => sum + ensureNumber(t.amount), 0);
-        
-      return total.toFixed(2).replace('.', ',');
+      // Se for tipo income, apenas considere transações regulares
+      if (type === 'income') {
+        const total = transactions
+          .filter(t => {
+            const date = new Date(t.date);
+            const today = new Date();
+            return date.getMonth() === today.getMonth() && 
+                  date.getFullYear() === today.getFullYear() &&
+                  t.type === type;
+          })
+          .reduce((sum, t) => sum + ensureNumber(t.amount), 0);
+          
+        return total.toFixed(2).replace('.', ',');
+      } 
+      // Se for expense, considere tanto transações regulares quanto contribuições
+      else if (type === 'expense') {
+        const transactionsTotal = transactions
+          .filter(t => {
+            const date = new Date(t.date);
+            const today = new Date();
+            return date.getMonth() === today.getMonth() && 
+                  date.getFullYear() === today.getFullYear() &&
+                  t.type === type;
+          })
+          .reduce((sum, t) => sum + ensureNumber(t.amount), 0);
+          
+        const contributionsTotal = contributions
+          .filter(c => {
+            const date = new Date(c.date);
+            const today = new Date();
+            return date.getMonth() === today.getMonth() && 
+                  date.getFullYear() === today.getFullYear();
+          })
+          .reduce((sum, c) => sum + ensureNumber(c.amount), 0);
+          
+        return (transactionsTotal + contributionsTotal).toFixed(2).replace('.', ',');
+      }
+      
+      return "0,00";
     } catch (error) {
       console.error(`Erro ao calcular total mensal para ${type}:`, error);
       return "0,00";
@@ -284,7 +374,7 @@ const Transactions = () => {
                   </div>
                 </div>
                 
-                {/* Category filter - MODIFICADO para usar dados dinâmicos */}
+                {/* Category filter - com categoria especial "Metas" */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
                   <select 
@@ -293,6 +383,7 @@ const Transactions = () => {
                     onChange={(e) => setFilterCategory(e.target.value)}
                   >
                     <option value="">Todas categorias</option>
+                    <option value="Metas">Metas</option>
                     {categories.map(category => (
                       <option key={category.id} value={category.id}>
                         {category.name}
@@ -317,7 +408,7 @@ const Transactions = () => {
                   </select>
                 </div>
                 
-                {/* Account filter - MODIFICADO para usar dados dinâmicos */}
+                {/* Account filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Conta</label>
                   <select 
@@ -369,8 +460,8 @@ const Transactions = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Este mês</span>
                   <span className="text-primary font-medium">
-                    {transactions.filter(t => {
-                      const date = new Date(t.date);
+                    {combinedTransactions.filter(item => {
+                      const date = new Date(item.date);
                       const today = new Date();
                       return date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
                     }).length} transações
@@ -452,41 +543,50 @@ const Transactions = () => {
             
             {/* Table content */}
             <div className="divide-y divide-gray-100">
-              {transactions.length > 0 ? (
-                transactions.map(transaction => {
+              {combinedTransactions.length > 0 ? (
+                combinedTransactions.map(item => {
+                  // Determinar se é uma transação ou contribuição
+                  const isContribution = item.isContribution;
+                  
                   // Buscar dados relacionados (se estiverem disponíveis)
-                  const category = categories.find(c => c.id === transaction.categoryId) || {};
-                  const account = accounts.find(a => a.id === transaction.accountId) || {};
+                  const category = isContribution 
+                    ? { name: 'Metas', icon: 'bullseye', color: 'blue' }
+                    : (categories.find(c => c.id === item.categoryId) || {});
+                    
+                  const account = accounts.find(a => a.id === item.accountId) || {};
                   
                   return (
-                    <div key={transaction.id} className="transaction-card hover:bg-gray-50">
+                    <div key={item.id} className="transaction-card hover:bg-gray-50">
                       <div className="px-6 py-4 flex items-center justify-between">
                         <div className="flex items-center">
-                          <div className={`${transaction.type === 'income' ? 'bg-green-100' : 'bg-red-100'} p-3 rounded-lg mr-4`}>
-                            <i className={`${
-                              category.icon ? `fas ${category.icon}` : 
-                              category.name === 'Alimentação' ? 'fas fa-shopping-bag' :
-                              category.name === 'Moradia' ? 'fas fa-home' :
-                              category.name === 'Transporte' ? 'fas fa-car' :
-                              category.name === 'Lazer' ? 'fas fa-utensils' :
-                              category.name === 'Rendimento' ? 'fas fa-money-bill-wave' :
-                              'fas fa-tag'
-                            } ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}></i>
+                          <div className={`${isContribution ? 'bg-blue-100' : item.type === 'income' ? 'bg-green-100' : 'bg-red-100'} p-3 rounded-lg mr-4`}>
+                            <i className={`fas ${
+                              isContribution ? 'fa-bullseye' :
+                              category.icon ? (category.icon.startsWith('fa-') ? category.icon : `fa-${category.icon}`) : 
+                              category.name === 'Alimentação' ? 'fa-shopping-bag' :
+                              category.name === 'Moradia' ? 'fa-home' :
+                              category.name === 'Transporte' ? 'fa-car' :
+                              category.name === 'Lazer' ? 'fa-utensils' :
+                              category.name === 'Rendimento' ? 'fa-money-bill-wave' :
+                              'fa-tag'
+                            } ${isContribution ? 'text-blue-600' : item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}></i>
                           </div>
                           <div>
-                            <h4 className="font-medium">{transaction.description}</h4>
+                            <h4 className="font-medium">{item.description}</h4>
                             <p className="text-sm text-gray-500">
-                              {transaction.place && `${transaction.place} • `}
-                              {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                              {!isContribution && item.place && `${item.place} • `}
+                              {new Date(item.date).toLocaleDateString('pt-BR')}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className={`font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                            {transaction.type === 'income' ? '+' : '-'} R$ {ensureNumber(transaction.amount).toFixed(2).replace('.', ',')}
+                          <p className={`font-medium ${isContribution ? 'text-blue-600' : item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                            {isContribution || item.type === 'expense' ? '- ' : '+ '}
+                            R$ {ensureNumber(item.amount).toFixed(2).replace('.', ',')}
                           </p>
                           <div className="flex items-center justify-end mt-1">
                             <span className={`px-2 py-1 ${
+                              isContribution ? 'bg-blue-50 text-blue-600' :
                               category.color ? `bg-${category.color}-50 text-${category.color}-600` :
                               category.name === 'Alimentação' ? 'bg-red-50 text-red-600' :
                               category.name === 'Moradia' ? 'bg-blue-50 text-blue-600' :
@@ -495,9 +595,9 @@ const Transactions = () => {
                               category.name === 'Rendimento' ? 'bg-green-50 text-green-600' :
                               'bg-gray-50 text-gray-600'
                             } text-xs rounded-full mr-2`}>
-                              {category.name || transaction.category || 'Sem categoria'}
+                              {isContribution ? 'Metas' : category.name || item.category || 'Sem categoria'}
                             </span>
-                            <span className="text-xs text-gray-500">{account.name || transaction.account || 'Conta padrão'}</span>
+                            <span className="text-xs text-gray-500">{account.name || item.account || 'Conta padrão'}</span>
                           </div>
                         </div>
                       </div>
@@ -519,9 +619,9 @@ const Transactions = () => {
             </div>
             
             {/* Table footer */}
-            {transactions.length > 0 && (
+            {combinedTransactions.length > 0 && (
               <div className="px-6 py-4 border-t flex flex-col md:flex-row justify-between items-center">
-                <p className="text-sm text-gray-500 mb-2 md:mb-0">Mostrando {transactions.length} de {summary.count} transações</p>
+                <p className="text-sm text-gray-500 mb-2 md:mb-0">Mostrando {combinedTransactions.length} de {summary.count} transações</p>
                 <div className="flex space-x-2">
                   <button 
                     className={`px-3 py-1 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}

@@ -48,14 +48,35 @@ exports.getContributionById = async (req, res) => {
 // Criar nova contribuição
 exports.createContribution = async (req, res) => {
   try {
-    const contribution = await Contribution.create(req.body);
+    const { amount, accountId, ...contributionData } = req.body;
+    
+    // Criar a contribuição
+    const contribution = await Contribution.create({
+      amount,
+      accountId,
+      ...contributionData
+    });
+    
+    // Atualizar o saldo da conta (reduzir o valor)
+    const account = await Account.findByPk(accountId);
+    if (!account) {
+      return res.status(404).json({ message: 'Conta não encontrada' });
+    }
+    
+    // Diminuir o valor da contribuição do saldo da conta
+    const currentBalance = parseFloat(account.balance);
+    const contributionAmount = parseFloat(amount);
+    account.balance = currentBalance - contributionAmount;
+    
+    // Salvar a alteração na conta
+    await account.save();
+    
     res.status(201).json(contribution);
   } catch (error) {
     console.error('Erro ao criar contribuição:', error);
     res.status(400).json({ message: error.message });
   }
 };
-
 // Atualizar contribuição existente
 exports.updateContribution = async (req, res) => {
   try {

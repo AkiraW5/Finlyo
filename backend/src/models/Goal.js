@@ -1,20 +1,12 @@
+// backend/src/models/Budget.js
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
-const Category = require('./Category');
 
-const Budget = sequelize.define('Budget', {
+const Goal = sequelize.define('Goal', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
-  },
-  categoryId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'categories',
-      key: 'id'
-    }
   },
   category: {
     type: DataTypes.STRING,
@@ -28,14 +20,6 @@ const Budget = sequelize.define('Budget', {
     type: DataTypes.STRING,
     allowNull: false
   },
-  type: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    defaultValue: 'expense',
-    validate: {
-      isIn: [['expense', 'income', 'goal']]
-    }
-  },
   startDate: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
@@ -48,11 +32,8 @@ const Budget = sequelize.define('Budget', {
     defaultValue: ''
   }
 }, {
-  tableName: 'budgets',
+  tableName: 'goals',
   timestamps: true
 });
 
-// Definir associação com Category
-Budget.belongsTo(Category, { foreignKey: 'categoryId' });
-
-module.exports = Budget;
+module.exports = Goal;

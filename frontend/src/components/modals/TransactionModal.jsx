@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext'; // Importar o contexto de autenticação
+
+
 
 const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) => {
   const [transactionType, setTransactionType] = useState('income');
@@ -10,6 +13,37 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
   const [account, setAccount] = useState('');
   const [accountId, setAccountId] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Obter o usuário atual do contexto de autenticação
+  const { currentUser } = useAuth();
+
+  // Estados do formulário
+  const [formData, setFormData] = useState({
+    description: '',
+    amount: '',
+    type: 'expense',
+    categoryId: '',
+    accountId: '',
+    date: new Date().toISOString().substr(0, 10),
+    notes: ''
+  });
+
+    // Resetar o formulário quando o modal é aberto
+    useEffect(() => {
+      if (isOpen) {
+        setFormData({
+          description: '',
+          amount: '',
+          type: 'expense',
+          categoryId: categories.length > 0 ? categories[0].id : '',
+          accountId: accounts.length > 0 ? accounts[0].id : '',
+          date: new Date().toISOString().substr(0, 10),
+          notes: ''
+        });
+      }
+    }, [isOpen, accounts, categories]);
+
+    
 
   // Função para censurar o número da conta
   const maskAccountNumber = (accountNumber) => {

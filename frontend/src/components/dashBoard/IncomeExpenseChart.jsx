@@ -1,90 +1,112 @@
 import React, { useEffect, useRef } from 'react';
-import Chart from 'chart.js';
+import Chart from 'chart.js/auto';
 
-const IncomeExpenseChart = () => {
+const IncomeExpenseChart = ({ data }) => {
   const chartRef = useRef(null);
+  const chartInstance = useRef(null);
   
   useEffect(() => {
-    if (chartRef && chartRef.current) {
-      const ctx = chartRef.current.getContext('2d');
-      
-      new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
-          datasets: [
-            {
-              label: 'Receitas',
-              data: [4500, 4800, 5000, 4900, 5100, 5200],
-              backgroundColor: '#10b981',
-              borderRadius: 4
-            },
-            {
-              label: 'Despesas',
-              data: [3200, 3500, 3800, 3600, 3700, 3741],
-              backgroundColor: '#ef4444',
-              borderRadius: 4
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            y: {
-              beginAtZero: true,
-              grid: {
-                drawBorder: false
-              },
-              ticks: {
-                callback: function(value) {
-                  return 'R$ ' + value.toLocaleString('pt-BR');
+    // Se não houver dados ou referência ao canvas, não fazer nada
+    if (!data || !data.length || !chartRef.current) return;
+    
+    // Destruir gráfico existente se houver
+    if (chartInstance.current) {
+      chartInstance.current.destroy();
+    }
+    
+    const ctx = chartRef.current.getContext('2d');
+    
+    // Preparar dados para o gráfico
+    const labels = data.map(item => item.date);
+    const incomeData = data.map(item => item.income);
+    const expenseData = data.map(item => item.expense);
+    
+    // Criar novo gráfico
+    chartInstance.current = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Receitas',
+            data: incomeData,
+            backgroundColor: 'rgba(16, 185, 129, 0.7)', // Verde
+            borderWidth: 0,
+            borderRadius: 4
+          },
+          {
+            label: 'Despesas',
+            data: expenseData,
+            backgroundColor: 'rgba(239, 68, 68, 0.7)', // Vermelho
+            borderWidth: 0,
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) {
+                  label += ': ';
                 }
+                if (context.parsed.y !== null) {
+                  label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y);
+                }
+                return label;
               }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false
             },
-            x: {
-              grid: {
-                display: false
-              }
+            title: {
+              display: true,
+              text: 'Dia do mês'
             }
           },
-          plugins: {
-            legend: {
-              position: 'top',
-              align: 'end',
-              labels: {
-                usePointStyle: true,
-                boxWidth: 6
-              }
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
             },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  let label = context.dataset.label || '';
-                  if (label) {
-                    label += ': ';
-                  }
-                  label += 'R$ ' + context.raw.toLocaleString('pt-BR');
-                  return label;
-                }
+            ticks: {
+              callback: function(value) {
+                return 'R$ ' + value.toLocaleString('pt-BR');
               }
             }
           }
         }
-      });
-    }
-  }, []);
+      }
+    });
+    
+    // Limpeza ao desmontar componente
+    return () => {
+      if (chartInstance.current) {
+        chartInstance.current.destroy();
+      }
+    };
+  }, [data]);
   
   return (
-    <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-semibold text-gray-800">Receitas vs Despesas</h3>
         <div className="flex space-x-2">
-          <button className="px-3 py-1 text-xs bg-indigo-50 text-indigo-700 rounded-full">Mensal</button>
-          <button className="px-3 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">Anual</button>
+          <span className="text-xs text-gray-500">Este mês</span>
         </div>
       </div>
-      <div className="h-64">
+      <div className="h-80">
         <canvas ref={chartRef}></canvas>
       </div>
     </div>

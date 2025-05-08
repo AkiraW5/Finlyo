@@ -2,12 +2,13 @@
 const express = require('express');
 const router = express.Router();
 const transactionController = require('../controllers/transactionController');
+const { authenticateToken } = require('../middlewares/auth');
 
-// Rotas para transações
-router.get('/', transactionController.getTransactions);
-router.get('/:id', transactionController.getTransactionById);
-router.post('/', transactionController.createTransaction);
-router.put('/:id', transactionController.updateTransaction);
-router.delete('/:id', transactionController.deleteTransaction);
+// Proteger todas as rotas com o middleware de autenticação
+router.get('/', authenticateToken, transactionController.getTransactions);
+router.get('/:id', authenticateToken, transactionController.getTransactionById);
+router.post('/', authenticateToken, transactionController.createTransaction);
+router.put('/:id', authenticateToken, transactionController.updateTransaction);
+router.delete('/:id', authenticateToken, transactionController.deleteTransaction);
 
 module.exports = router;

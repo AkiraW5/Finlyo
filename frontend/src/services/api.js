@@ -17,6 +17,62 @@ axios.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+// Funções de autenticação
+export const loginUser = async (credentials) => {
+  try {
+    const response = await axios.post(`${API_URL}/auth/login`, credentials);
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+    }
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao fazer login:', error);
+    throw error;
+  }
+};
+
+export const registerUser = async (userData) => {
+  try {
+    const response = await axios.post(`${API_URL}/auth/register`, userData);
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+    }
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao registrar usuário:', error);
+    throw error;
+  }
+};
+
+export const logoutUser = () => {
+  localStorage.removeItem('token');
+  delete axios.defaults.headers.common['Authorization'];
+};
+
+export const getAuthToken = () => {
+  return localStorage.getItem('token');
+};
+
+export const isAuthenticated = () => {
+  return !!getAuthToken();
+};
+
+// Configurar interceptor para adicionar token automaticamente
+axios.interceptors.request.use(
+  (config) => {
+    const token = getAuthToken();
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Transações
 export const getTransactions = async () => {
   try {
@@ -68,26 +124,98 @@ export const getBudgets = async () => {
     }
 };
 
-// NOVAS FUNÇÕES ADICIONADAS:
+// Função para buscar todas as metas
+export const getGoals = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/goals`);
+    return response.data;
+  } catch (error) {
+    throw new Error('Erro ao buscar metas: ' + error.message);
+  }
+};
+
+// Função para buscar uma meta específica
+export const getGoalById = async (id) => {
+  try {
+    const response = await axios.get(`${API_URL}/goals/${id}`);
+    return response.data;
+  } catch (error) {
+    throw new Error('Erro ao buscar meta: ' + error.message);
+  }
+};
+
+// Função para criar uma nova meta
+export const createGoal = async (goalData) => {
+  try {
+    const response = await axios.post(`${API_URL}/goals`, goalData);
+    return response.data;
+  } catch (error) {
+    throw new Error('Erro ao criar meta: ' + error.message);
+  }
+};
+
+// Função para atualizar uma meta existente
+export const updateGoal = async (id, goalData) => {
+  try {
+    const response = await axios.put(`${API_URL}/goals/${id}`, goalData);
+    return response.data;
+  } catch (error) {
+    throw new Error('Erro ao atualizar meta: ' + error.message);
+  }
+};
+
+// Função para excluir uma meta
+export const deleteGoal = async (id) => {
+  try {
+    await axios.delete(`${API_URL}/goals/${id}`);
+  } catch (error) {
+    throw new Error('Erro ao excluir meta: ' + error.message);
+  }
+};
 
 // Função para criar um novo orçamento
 export const createBudget = async (budgetData) => {
-    try {
-        const response = await axios.post(`${API_URL}/budgets`, budgetData);
-        return response.data;
-    } catch (error) {
-        throw new Error('Erro ao criar orçamento: ' + error.message);
+  try {
+    // Garantir que categoryId seja um número
+    if (budgetData.categoryId) {
+      budgetData.categoryId = parseInt(budgetData.categoryId, 10);
     }
+    
+    // Garantir que amount seja um número
+    if (budgetData.amount) {
+      budgetData.amount = parseFloat(budgetData.amount);
+    }
+    
+    const response = await axios.post(`${API_URL}/budgets`, budgetData);
+    return response.data;
+  } catch (error) {
+    console.error('Erro detalhado:', error.response?.data);
+    throw new Error(`Erro ao criar orçamento: ${error.response?.data?.message || error.message}`);
+  }
+};
+
+export const deleteContribution = async (id) => {
+  try {
+    const response = await axios.delete(`${API_URL}/contributions/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao excluir contribuição:', error);
+    throw error;
+  }
 };
 
 // Função para atualizar um orçamento existente
 export const updateBudget = async (id, budgetData) => {
-    try {
-        const response = await axios.put(`${API_URL}/budgets/${id}`, budgetData);
-        return response.data;
-    } catch (error) {
-        throw new Error('Erro ao atualizar orçamento: ' + error.message);
-    }
+  if (!id) {
+    throw new Error('ID do orçamento é necessário para atualização');
+  }
+  
+  try {
+    const response = await axios.put(`${API_URL}/budgets/${id}`, budgetData);
+    return response.data;
+  } catch (error) {
+    throw new Error(`Erro ao atualizar orçamento: ${error.message}`);
+  }
 };
 
 // Função para excluir um orçamento
@@ -198,14 +326,14 @@ export const getCategoryTransactions = async (categoryId) => {
 };
 
 export const createContribution = async (contributionData) => {
-    try {
-      const response = await axios.post('/api/contributions', contributionData);
-      return response.data;
-    } catch (error) {
-      console.error("Erro ao criar contribuição:", error);
-      throw error;
-    }
-  };
+  try {
+    const response = await axios.post(`${API_URL}/contributions`, contributionData);
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao criar contribuição:", error);
+    throw error;
+  }
+};
   
   // Também adicione essa função para buscar contribuições
   export const getContributions = async () => {
@@ -217,3 +345,27 @@ export const createContribution = async (contributionData) => {
       throw error;
     }
   };
+
+// Função para obter configurações do usuário
+export const getUserSettings = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/settings`);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao buscar configurações:', error);
+    // Retornar objeto vazio em caso de erro para não quebrar a aplicação
+    return {};
+  }
+};
+
+// Função para atualizar configurações do usuário
+export const updateUserSettings = async (settingsData) => {
+  try {
+    const response = await axios.put(`${API_URL}/settings`, settingsData);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao atualizar configurações:', error);
+    throw new Error('Erro ao atualizar configurações: ' + error.message);
+  }
+};
+

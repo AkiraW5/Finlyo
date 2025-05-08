@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getAccounts, createAccount, deleteAccount, updateAccount, getTransactions } from '../services/api';
+import { 
+  getAccounts, 
+  createAccount, 
+  deleteAccount, 
+  updateAccount, 
+  getTransactions, 
+  getContributions 
+} from '../services/api';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import MobileSidebar from './layout/MobileSidebar';
@@ -9,6 +16,7 @@ const Accounts = () => {
   // Estados
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [contributions, setContributions] = useState([]); // Novo estado para contribuições
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
@@ -23,7 +31,7 @@ const Accounts = () => {
     expenseChange: 0
   });
 
-  // Buscar contas e transações
+  // Buscar contas, transações e contribuições
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -37,9 +45,13 @@ const Accounts = () => {
         const transactionsData = await getTransactions();
         setTransactions(transactionsData);
         
+        // Buscar contribuições
+        const contributionsData = await getContributions();
+        setContributions(contributionsData);
+        
         // Calcular saldos correntes das contas e sumários
-        calculateCurrentBalances(accountsData, transactionsData);
-        calculateSummary(accountsData, transactionsData);
+        calculateCurrentBalances(accountsData, transactionsData, contributionsData);
+        calculateSummary(accountsData, transactionsData, contributionsData);
       } catch (error) {
         console.error("Erro ao buscar dados:", error);
       } finally {
@@ -50,8 +62,8 @@ const Accounts = () => {
     fetchData();
   }, []);
 
-  // Calcular saldos atuais das contas considerando transações
-  const calculateCurrentBalances = (accountsData, transactionsData = []) => {
+  // Calcular saldos atuais das contas considerando transações e contribuições
+  const calculateCurrentBalances = (accountsData, transactionsData = [], contributionsData = []) => {
     if (!accountsData || accountsData.length === 0) return {};
     
     // Inicializar objeto de saldos com os valores iniciais das contas
@@ -78,14 +90,26 @@ const Accounts = () => {
       });
     }
     
+    // Processar todas as contribuições como saídas de dinheiro
+    if (contributionsData && contributionsData.length > 0) {
+      contributionsData.forEach(contribution => {
+        const accountId = contribution.accountId;
+        if (accountId && balances.hasOwnProperty(accountId)) {
+          const amount = parseFloat(contribution.amount) || 0;
+          // Contribuições diminuem o saldo da conta
+          balances[accountId] -= amount;
+        }
+      });
+    }
+    
     setCurrentBalances(balances);
     return balances;
   };
 
-  // Calcular sumário de contas e transações
-  const calculateSummary = (accountsData, transactionsData = []) => {
+  // Calcular sumário de contas, transações e contribuições
+  const calculateSummary = (accountsData, transactionsData = [], contributionsData = []) => {
     // Calcular saldo total considerando os saldos atualizados
-    const updatedBalances = calculateCurrentBalances(accountsData, transactionsData);
+    const updatedBalances = calculateCurrentBalances(accountsData, transactionsData, contributionsData);
     let balance = 0;
     
     if (accountsData && accountsData.length > 0) {
@@ -144,6 +168,29 @@ const Accounts = () => {
         .reduce((sum, transaction) => sum + parseFloat(transaction.amount || 0), 0);
     }
     
+    // Adicionar contribuições às despesas
+    if (contributionsData && contributionsData.length > 0) {
+      // Contribuições do mês atual
+      const currentMonthContributions = contributionsData.filter(contribution => {
+        const contribDate = new Date(contribution.date);
+        return contribDate >= firstDayCurrentMonth;
+      });
+      
+      // Contribuições do mês anterior
+      const previousMonthContributions = contributionsData.filter(contribution => {
+        const contribDate = new Date(contribution.date);
+        return contribDate >= firstDayPreviousMonth && contribDate <= lastDayPreviousMonth;
+      });
+      
+      // Adicionar às despesas do mês atual
+      currentMonthExpense += currentMonthContributions
+        .reduce((sum, contribution) => sum + parseFloat(contribution.amount || 0), 0);
+        
+      // Adicionar às despesas do mês anterior
+      previousMonthExpense += previousMonthContributions
+        .reduce((sum, contribution) => sum + parseFloat(contribution.amount || 0), 0);
+    }
+    
     // Calcular variações percentuais
     const incomeChange = previousMonthIncome === 0 
       ? 100 
@@ -171,11 +218,54 @@ const Accounts = () => {
 
   // Obter transações recentes (apenas as 5 mais recentes)
   const getRecentTransactions = () => {
-    if (!transactions || !transactions.length) return [];
+    if (!transactions || !transactions.length) {
+      if (!contributions || !contributions.length) return [];
+      
+      // Se não há transações mas há contribuições, retornar apenas contribuições transformadas
+      return contributions
+        .map(c => ({
+          id: `contrib-${c.id}`,
+          description: c.notes || 'Contribuição para meta',
+          amount: parseFloat(c.amount) || 0,
+          date: c.date,
+          type: 'expense',
+          category: 'Metas',
+          accountId: c.accountId,
+          budgetId: c.budgetId,
+          isContribution: true
+        }))
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .slice(0, 5);
+    }
     
-    return transactions
-      .sort((a, b) => new Date(b.date) - new Date(a.date)) // Ordena por data, mais recentes primeiro
-      .slice(0, 5); // Pega apenas as 5 primeiras
+    // Se não há contribuições, retornar apenas transações
+    if (!contributions || !contributions.length) {
+      return transactions
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .slice(0, 5);
+    }
+    
+    // Caso haja ambos, combinar e ordenar por data
+    const transactionsFormatted = transactions.map(t => ({
+      ...t,
+      isTransaction: true
+    }));
+    
+    const contributionsFormatted = contributions.map(c => ({
+      id: `contrib-${c.id}`,
+      description: c.notes || 'Contribuição para meta',
+      amount: parseFloat(c.amount) || 0,
+      date: c.date,
+      type: 'expense',
+      category: 'Metas',
+      accountId: c.accountId,
+      budgetId: c.budgetId,
+      isContribution: true
+    }));
+    
+    return [...transactionsFormatted, ...contributionsFormatted]
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 5); // Pegar apenas as 5 mais recentes
   };
     
   // Função para encontrar o nome da conta pelo ID
@@ -545,29 +635,37 @@ const Accounts = () => {
             
             <div className="divide-y divide-gray-100">
               {recentTransactions.length > 0 ? (
-                recentTransactions.map((transaction) => (
-                  <div key={transaction.id} className="hover:bg-gray-50">
-                    <div className="px-6 py-4 flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className={`${transaction.type === 'income' ? 'bg-green-100' : 'bg-red-100'} p-3 rounded-lg mr-4`}>
-                          <i className={`fas fa-${getCategoryIcon(transaction.category)} ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}></i>
+                recentTransactions.map((item) => {
+                  const isContribution = item.isContribution;
+                  
+                  return (
+                    <div key={item.id} className="hover:bg-gray-50">
+                      <div className="px-6 py-4 flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className={`${isContribution ? 'bg-blue-100' : 
+                            item.type === 'income' ? 'bg-green-100' : 'bg-red-100'} p-3 rounded-lg mr-4`}>
+                            <i className={`fas fa-${isContribution ? 'bullseye' : getCategoryIcon(item.category)} 
+                              ${isContribution ? 'text-blue-600' : 
+                                item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}></i>
+                          </div>
+                          <div>
+                            <h4 className="font-medium">{item.description}</h4>
+                            <p className="text-sm text-gray-500">
+                              {getAccountNameById(item.accountId)} • {new Date(item.date).toLocaleDateString('pt-BR')}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-medium">{transaction.description}</h4>
-                          <p className="text-sm text-gray-500">
-                            {getAccountNameById(transaction.accountId)} • {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                        <div className="text-right">
+                          <p className={`font-medium ${isContribution ? 'text-blue-600' : 
+                            item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                            {isContribution ? '- ' : item.type === 'income' ? '+ ' : '- '}
+                            {formatCurrency(item.amount)}
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className={`font-medium ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                          {transaction.type === 'income' ? '+ ' : '- '}
-                          {formatCurrency(transaction.amount)}
-                        </p>
-                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="px-6 py-8 text-center text-gray-500">
                   <p>Nenhuma transação recente encontrada.</p>
