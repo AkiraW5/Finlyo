@@ -21,7 +21,7 @@ const Account = sequelize.define('Account', {
     allowNull: false
   },
   type: {
-    type: DataTypes.ENUM('checking', 'savings', 'credit', 'investment', 'wallet'),
+    type: DataTypes.ENUM('checking', 'savings', 'credit', 'investment', 'wallet', 'other'),
     allowNull: false
   },
   balance: {
@@ -47,6 +47,24 @@ const Account = sequelize.define('Account', {
   notes: {
     type: DataTypes.TEXT,
     allowNull: true
+  },
+  // Novos campos para cartão de crédito
+  creditLimit: {
+    type: DataTypes.DECIMAL(15, 2),
+    allowNull: true,
+    defaultValue: 0
+  },
+  cardNumber: {
+    type: DataTypes.STRING(16),
+    allowNull: true
+  },
+  linkedAccountId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'accounts',
+      key: 'id'
+    }
   }
 }, {
   tableName: 'accounts',
@@ -56,5 +74,9 @@ const Account = sequelize.define('Account', {
 // Definir relacionamento com User
 Account.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(Account, { foreignKey: 'userId' });
+
+// Relacionamento auto-referencial para vincular cartões de crédito a contas bancárias
+Account.belongsTo(Account, { as: 'linkedAccount', foreignKey: 'linkedAccountId' });
+Account.hasMany(Account, { as: 'linkedCards', foreignKey: 'linkedAccountId' });
 
 module.exports = Account;

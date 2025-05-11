@@ -191,6 +191,142 @@ async function createDefaultCategoriesIfNotExist() {
   }
 }
 
+async function addCreditCardFieldsToAccounts() {
+  try {
+    console.log('Verificando e adicionando campos de cartão de crédito na tabela accounts...');
+    
+    // Verificar se a tabela existe
+    const [tableExists] = await sequelize.query(`
+      SELECT COUNT(*) as count 
+      FROM information_schema.tables 
+      WHERE table_schema = '${env.DB_NAME}' 
+      AND table_name = 'accounts'
+    `);
+    
+    if (tableExists[0].count === 0) {
+      console.log(`Tabela accounts não existe ainda, será criada na sincronização.`);
+      return;
+    }
+    
+    // 1. Verificar e adicionar campo creditLimit
+    const [creditLimitExists] = await sequelize.query(`
+      SELECT COUNT(*) as count
+      FROM information_schema.COLUMNS 
+      WHERE TABLE_SCHEMA = '${env.DB_NAME}'
+      AND TABLE_NAME = 'accounts'
+      AND COLUMN_NAME = 'creditLimit'
+    `);
+    
+    if (creditLimitExists[0].count === 0) {
+      console.log('Adicionando coluna creditLimit na tabela accounts...');
+      await sequelize.query(`
+        ALTER TABLE accounts
+        ADD COLUMN creditLimit DECIMAL(15, 2) DEFAULT 0
+      `);
+      console.log('Coluna creditLimit adicionada com sucesso.');
+    } else {
+      console.log('Coluna creditLimit já existe na tabela accounts.');
+    }
+    
+    // 2. Verificar e adicionar campo cardNumber
+    const [cardNumberExists] = await sequelize.query(`
+      SELECT COUNT(*) as count
+      FROM information_schema.COLUMNS 
+      WHERE TABLE_SCHEMA = '${env.DB_NAME}'
+      AND TABLE_NAME = 'accounts'
+      AND COLUMN_NAME = 'cardNumber'
+    `);
+    
+    if (cardNumberExists[0].count === 0) {
+      console.log('Adicionando coluna cardNumber na tabela accounts...');
+      await sequelize.query(`
+        ALTER TABLE accounts
+        ADD COLUMN cardNumber VARCHAR(16)
+      `);
+      console.log('Coluna cardNumber adicionada com sucesso.');
+    } else {
+      console.log('Coluna cardNumber já existe na tabela accounts.');
+    }
+    
+    // 3. Verificar e adicionar campo linkedAccountId
+    const [linkedAccountExists] = await sequelize.query(`
+      SELECT COUNT(*) as count
+      FROM information_schema.COLUMNS 
+      WHERE TABLE_SCHEMA = '${env.DB_NAME}'
+      AND TABLE_NAME = 'accounts'
+      AND COLUMN_NAME = 'linkedAccountId'
+    `);
+    
+    if (linkedAccountExists[0].count === 0) {
+      console.log('Adicionando coluna linkedAccountId na tabela accounts...');
+      await sequelize.query(`
+        ALTER TABLE accounts
+        ADD COLUMN linkedAccountId INT,
+        ADD CONSTRAINT fk_linked_account
+        FOREIGN KEY (linkedAccountId) REFERENCES accounts(id)
+        ON DELETE SET NULL
+      `);
+      console.log('Coluna linkedAccountId adicionada com sucesso.');
+    } else {
+      console.log('Coluna linkedAccountId já existe na tabela accounts.');
+    }
+    
+    // Atualizar contas de cartão de crédito existentes com valores padrão
+    console.log('Atualizando cartões de crédito existentes com valores padrão...');
+    await sequelize.query(`
+      UPDATE accounts 
+      SET creditLimit = 1000.00 
+      WHERE type = 'credit' AND creditLimit IS NULL
+    `);
+    
+    console.log('Campos de cartão de crédito verificados e atualizados com sucesso.');
+  } catch (error) {
+    console.error('Erro ao adicionar campos de cartão de crédito:', error);
+  }
+}
+
+// Adicionar ao dbInit.js
+async function syncCreditCardBalances() {
+  try {
+    console.log('Sincronizando saldos de cartões de crédito com transações...');
+    
+    // Buscar todos os cartões de crédito
+    const creditCards = await Account.findAll({
+      where: { type: 'credit' }
+    });
+    
+    for (const card of creditCards) {
+      // Buscar todas as transações do cartão
+      const transactions = await Transaction.findAll({
+        where: { accountId: card.id }
+      });
+      
+      let calculatedBalance = 0;
+      
+      // Calcular o saldo com base nas transações
+      transactions.forEach(tx => {
+        if (tx.type === 'expense') {
+          calculatedBalance += parseFloat(tx.amount || 0);
+        } else {
+          calculatedBalance -= parseFloat(tx.amount || 0);
+        }
+      });
+      
+      // Ajustar o sinal para representar débito
+      calculatedBalance = Math.abs(calculatedBalance);
+      
+      console.log(`Atualizando cartão ${card.name} (ID: ${card.id}): Saldo calculado = ${calculatedBalance}`);
+      
+      // Atualizar o saldo do cartão
+      await card.update({ balance: calculatedBalance });
+    }
+    
+    console.log('Sincronização de saldos de cartões concluída');
+  } catch (error) {
+    console.error('Erro ao sincronizar saldos de cartões:', error);
+  }
+}
+
 // Função para criar contas padrão para o usuário admin
 async function createDefaultAccountsForAdmin() {
   try {
@@ -285,6 +421,7 @@ async function initializeDatabase() {
     
     // Passo 2: Sincronizar os modelos com o banco de dados de forma segura
     await safeSyncModels();
+    await syncCreditCardBalances();
     
     // Passo 3: Criar dados padrão se necessário
     await createDefaultAdminIfNotExists();

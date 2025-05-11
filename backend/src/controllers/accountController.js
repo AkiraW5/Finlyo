@@ -40,8 +40,34 @@ exports.getAccountById = async (req, res) => {
 // Criar uma nova conta
 exports.createAccount = async (req, res) => {
   try {
-    const userId = req.user.id; // Obtido do token JWT
+    const userId = req.user.id;
     const accountData = { ...req.body, userId };
+    
+    // Se for cartão de crédito, garantir que o cardNumber seja processado corretamente
+    if (accountData.type === 'credit') {
+      // Remover espaços ou outros caracteres do número do cartão
+      if (accountData.cardNumber) {
+        accountData.cardNumber = accountData.cardNumber.replace(/\D/g, '');
+      }
+      
+      // Verificar se a conta vinculada pertence ao mesmo usuário
+      if (accountData.linkedAccountId) {
+        const linkedAccount = await Account.findOne({
+          where: { id: accountData.linkedAccountId, userId }
+        });
+        
+        if (!linkedAccount) {
+          return res.status(400).json({ 
+            message: 'A conta vinculada não foi encontrada ou não pertence a você' 
+          });
+        }
+      }
+    } else {
+      // Se não for cartão de crédito, limpar esses campos
+      accountData.cardNumber = null;
+      accountData.linkedAccountId = null;
+      accountData.creditLimit = null;
+    }
     
     // Se for marcada como padrão, desmarcar outras contas como padrão
     if (accountData.isDefault) {
@@ -72,6 +98,32 @@ exports.updateAccount = async (req, res) => {
     
     if (!account) {
       return res.status(404).json({ message: 'Conta não encontrada' });
+    }
+    
+    // Se for cartão de crédito, processar os campos específicos
+    if (accountData.type === 'credit') {
+      // Remover espaços ou outros caracteres do número do cartão
+      if (accountData.cardNumber) {
+        accountData.cardNumber = accountData.cardNumber.replace(/\D/g, '');
+      }
+      
+      // Verificar se a conta vinculada pertence ao mesmo usuário
+      if (accountData.linkedAccountId) {
+        const linkedAccount = await Account.findOne({
+          where: { id: accountData.linkedAccountId, userId }
+        });
+        
+        if (!linkedAccount) {
+          return res.status(400).json({ 
+            message: 'A conta vinculada não foi encontrada ou não pertence a você' 
+          });
+        }
+      }
+    } else {
+      // Se não for cartão de crédito, limpar esses campos
+      accountData.cardNumber = null;
+      accountData.linkedAccountId = null;
+      accountData.creditLimit = null;
     }
     
     // Se for marcada como padrão, desmarcar outras contas como padrão

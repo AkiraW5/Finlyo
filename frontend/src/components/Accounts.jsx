@@ -5,13 +5,16 @@ import {
   deleteAccount, 
   updateAccount, 
   getTransactions, 
-  getContributions
+  createTransaction,
+  getContributions,
+  payCreditCardBill
 } from '../services/api';
 import { useUserSettingsContext } from '../contexts/UserSettingsContext';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import MobileSidebar from './layout/MobileSidebar';
 import AccountModal from './modals/AccountModal';
+import PayCreditCardModal from './modals/PayCreditCardModal';
 
 const Accounts = () => {
   // Estados
@@ -39,6 +42,38 @@ const Accounts = () => {
     formatDate, 
     showBalance 
   } = useUserSettingsContext();
+
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedCreditCard, setSelectedCreditCard] = useState(null);
+
+  // Adicionar função para abrir o modal de pagamento
+  const handleOpenPaymentModal = (creditCard) => {
+    setSelectedCreditCard(creditCard);
+    setPaymentModalOpen(true);
+  };
+
+  // Adicionar função para processar o pagamento
+  const handlePayCreditCard = async (paymentData) => {
+    try {
+      await payCreditCardBill(paymentData);
+      
+      // Recarregar contas e transações
+      const [accountsData, transactionsData] = await Promise.all([
+        getAccounts(),
+        getTransactions()
+      ]);
+      
+      setAccounts(accountsData);
+      setTransactions(transactionsData);
+      calculateCurrentBalances(accountsData, transactionsData);
+      
+      setPaymentModalOpen(false);
+      showNotification('Fatura paga com sucesso!');
+    } catch (error) {
+      console.error('Erro ao pagar fatura:', error);
+      showNotification('Erro ao pagar fatura!', 'error');
+    }
+  };
 
   // Buscar contas, transações e contribuições
   useEffect(() => {
@@ -78,9 +113,15 @@ const Accounts = () => {
     // Inicializar objeto de saldos com os valores iniciais das contas
     const balances = {};
     accountsData.forEach(account => {
-      balances[account.id] = parseFloat(account.balance) || 0;
+      // Para contas de cartão de crédito, inicializar com zero e calcular com base nas transações
+      if (account.type === 'credit') {
+        balances[account.id] = 0;
+      } else {
+        // Para outras contas, usar o saldo inicial
+        balances[account.id] = parseFloat(account.balance) || 0;
+      }
     });
-    
+  
     // Processar todas as transações para atualizar os saldos
     if (transactionsData && transactionsData.length > 0) {
       transactionsData.forEach(transaction => {
@@ -88,17 +129,26 @@ const Accounts = () => {
         if (accountId && balances.hasOwnProperty(accountId)) {
           const amount = parseFloat(transaction.amount) || 0;
           
-          if (transaction.type === 'income') {
-            // Receitas aumentam o saldo da conta
-            balances[accountId] += amount;
-          } else if (transaction.type === 'expense') {
-            // Despesas diminuem o saldo da conta
-            balances[accountId] -= amount;
+          // Cartões de crédito têm lógica inversa: despesas aumentam a fatura (positivo)
+          const account = accountsData.find(acc => acc.id === accountId);
+          if (account && account.type === 'credit') {
+            if (transaction.type === 'expense') {
+              balances[accountId] += amount; // Compras aumentam o saldo negativo
+            } else {
+              balances[accountId] -= amount; // Pagamentos diminuem o saldo negativo
+            }
+          } else {
+            // Lógica normal para outras contas
+            if (transaction.type === 'income') {
+              balances[accountId] += amount;
+            } else {
+              balances[accountId] -= amount;
+            }
           }
         }
       });
     }
-    
+
     // Processar todas as contribuições como saídas de dinheiro
     if (contributionsData && contributionsData.length > 0) {
       contributionsData.forEach(contribution => {
@@ -110,6 +160,12 @@ const Accounts = () => {
         }
       });
     }
+    // Para cartões de crédito, garantir que o saldo seja representado como um valor negativo
+    accountsData.forEach(account => {
+      if (account.type === 'credit' && balances[account.id] < 0) {
+        balances[account.id] = Math.abs(balances[account.id]);
+      }
+    });
     
     setCurrentBalances(balances);
     return balances;
@@ -324,20 +380,56 @@ const Accounts = () => {
   // Adicionar ou editar uma conta
   const handleSaveAccount = async (accountData) => {
     try {
+      let newAccount;
+      let initialFatureValue = 0;
       let updatedAccounts;
       
+      // Se for cartão de crédito, capturar o valor da fatura e zerar o balance
+      if (accountData.type === 'credit') {
+        initialFatureValue = accountData.balance || 0;
+        accountData.balance = 0; // Zeramos o balance para cartões de crédito
+      }
+
       if (editingAccount) {
         // Atualizar conta existente
         await updateAccount(editingAccount.id, accountData);
+        newAccount = {...accountData, id: editingAccount.id};
         updatedAccounts = accounts.map(account => 
-          account.id === editingAccount.id ? {...accountData, id: account.id} : account
+          account.id === editingAccount.id ? newAccount : account
         );
       } else {
         // Criar nova conta
-        const newAccount = await createAccount(accountData);
+        newAccount = await createAccount(accountData);
         updatedAccounts = [...accounts, newAccount];
+
+        // Se for um novo cartão de crédito e tiver valor inicial de fatura, criar transação
+        if (accountData.type === 'credit' && initialFatureValue > 0) {
+          // Criar transação para representar a fatura inicial
+          const transactionData = {
+            amount: initialFatureValue,
+            type: 'expense',
+            description: `Fatura inicial - ${accountData.name}`,
+            date: new Date().toISOString().split('T')[0], // Data atual formato YYYY-MM-DD
+            accountId: newAccount.id,
+            categoryId: null, // Sem categoria específica
+            category: 'Cartão de Crédito',
+            account: newAccount.name,
+            notes: 'Fatura inicial do cartão'
+          };
+
+          // Chamar API para criar a transação
+          await createTransaction(transactionData);
+          
+          // Atualizar lista de transações
+          const transactionsList = await getTransactions();
+          setTransactions(transactionsList);
+          
+          showNotification('Cartão de crédito e fatura inicial criados com sucesso!');
+        } else {
+          showNotification('Conta salva com sucesso!');
+        }
       }
-      
+        
       setAccounts(updatedAccounts);
       calculateCurrentBalances(updatedAccounts, transactions);
       calculateSummary(updatedAccounts, transactions);
@@ -585,6 +677,17 @@ const Accounts = () => {
               {accounts.length > 0 ? accounts.map(account => {
                 // Obter o saldo atualizado da conta
                 const currentBalance = getCurrentBalance(account.id);
+
+                // Calcular limite disponível para cartões de crédito
+                let availableLimit = 0;
+                let percentUsed = 0;
+                
+                if (account.type === 'credit' && account.creditLimit) {
+                  availableLimit = parseFloat(account.creditLimit) - currentBalance;
+                  percentUsed = (currentBalance / parseFloat(account.creditLimit)) * 100;
+                  if (percentUsed < 0) percentUsed = 0;
+                  if (percentUsed > 100) percentUsed = 100;
+                }
                 
                 return (
                   <div key={account.id} 
@@ -620,6 +723,14 @@ const Accounts = () => {
                           <a href={`/transactions?account=${account.id}`} className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-300 transition-colors">
                             Transações
                           </a>
+                            {account.type === 'credit' && (
+                              <button 
+                                onClick={() => handleOpenPaymentModal(account)} 
+                                className="block w-full text-left px-4 py-2 text-sm text-primary dark:text-indigo-400 hover:bg-gray-100 dark:hover:bg-dark-300 transition-colors"
+                              >
+                                Pagar Fatura
+                              </button>
+                            )}
                           <button onClick={() => handleDeleteAccount(account.id)} className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-dark-300 transition-colors">
                             Excluir
                           </button>
@@ -630,13 +741,67 @@ const Accounts = () => {
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                       {account.bankName && `${account.bankName} `}
                       {account.accountNumber && `•••• ${account.accountNumber.slice(-4)}`}
+                      {account.type === 'credit' && account.cardNumber && `•••• ${account.cardNumber.slice(-4)}`}
                     </p>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 dark:text-gray-300 text-sm">
-                        {account.type === 'credit' ? 'Fatura atual' : 'Saldo atual'}
-                      </span>
-                      {renderBalance(currentBalance, account.type)}
-                    </div>
+                    
+                    {/* Informações de saldo para contas normais */}
+                    {account.type !== 'credit' && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-300 text-sm">
+                          Saldo atual
+                        </span>
+                        {renderBalance(currentBalance, account.type)}
+                      </div>
+                    )}
+                    
+                    {/* Informações detalhadas para cartões de crédito */}
+                    {account.type === 'credit' && (
+                      <div className="space-y-2">
+                        {/* Fatura atual */}
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600 dark:text-gray-300 text-sm">
+                            Fatura atual
+                          </span>
+                          {renderBalance(currentBalance, account.type)}
+                        </div>
+                        
+                        {/* Limite do cartão */}
+                        {account.creditLimit && (
+                          <>
+                            {/* Barra de progresso do limite */}
+                            <div className="w-full bg-gray-200 dark:bg-dark-400 rounded-full h-2 mt-2">
+                              <div 
+                                className={`h-2 rounded-full ${
+                                  percentUsed > 90 ? 'bg-red-500 dark:bg-red-600' : 
+                                  percentUsed > 70 ? 'bg-yellow-500 dark:bg-yellow-600' : 
+                                  'bg-green-500 dark:bg-green-600'
+                                }`}
+                                style={{ width: `${percentUsed}%` }}
+                              ></div>
+                            </div>
+                            
+                            {/* Texto de limite */}
+                            <div className="flex justify-between items-center text-sm mt-1">
+                              <span className="text-gray-600 dark:text-gray-300">
+                                Limite disponível
+                              </span>
+                              <span className="font-medium text-green-600 dark:text-green-400">
+                                {showBalance ? formatCurrency(availableLimit) : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
+                              </span>
+                            </div>
+                            
+                            <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                              <span>
+                                Utilizado: {showBalance ? `${percentUsed.toFixed(0)}%` : '•••••'}
+                              </span>
+                              <span>
+                                Limite total: {showBalance ? formatCurrency(account.creditLimit) : '•••••'}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               }) : (
@@ -719,6 +884,15 @@ const Accounts = () => {
         onClose={() => {setAccountModalOpen(false); setEditingAccount(null);}}
         onSubmit={handleSaveAccount}
         account={editingAccount}
+        existingAccounts={accounts}  // Adicionando as contas existentes como prop
+      />
+
+      <PayCreditCardModal 
+        isOpen={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        onSubmit={handlePayCreditCard}
+        creditCardAccounts={accounts.filter(acc => acc.type === 'credit')}
+        bankAccounts={accounts.filter(acc => acc.type !== 'credit')}
       />
     </div>
   );

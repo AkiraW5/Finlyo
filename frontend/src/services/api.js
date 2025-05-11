@@ -106,8 +106,8 @@ export const updateTransaction = async (id, transactionData) => {
 
 export const deleteTransaction = async (id) => {
   try {
-    await axios.delete(`${API_URL}/transactions/${id}`);
-    return true;
+    const response = await axios.delete(`${API_URL}/transactions/${id}`);
+    return response.data;
   } catch (error) {
     console.error('Erro ao excluir transação:', error);
     throw error;
@@ -434,5 +434,16 @@ export const loadTest = {
       console.error(`Erro no teste DELETE ${endpoint}/${id}:`, error);
       throw error;
     }
+  }
+};
+
+// Função para pagar fatura de cartão de crédito
+export const payCreditCardBill = async (paymentData) => {
+  try {
+    const response = await axios.post(`${API_URL}/transactions/pay-credit-card`, paymentData);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao pagar fatura de cartão de crédito:', error);
+    throw error;
   }
 };

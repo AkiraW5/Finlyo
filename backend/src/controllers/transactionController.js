@@ -1,5 +1,7 @@
 // backend/src/controllers/transactionController.js
 const Transaction = require('../models/Transaction');
+const Account = require('../models/Account');
+const { sequelize } = require('../config/database'); // Adicionar esta importação
 
 // Create a new transaction
 exports.createTransaction = async (req, res) => {
@@ -117,5 +119,83 @@ exports.deleteTransaction = async (req, res) => {
   } catch (error) {
     console.error('Erro ao excluir transação:', error);
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Pagar fatura de cartão de crédito
+exports.payCreditCardBill = async (req, res) => {
+  const t = await sequelize.transaction();
+  
+  try {
+    const userId = req.user.id;
+    const { creditCardId, bankAccountId, amount, date, description, notes } = req.body;
+    
+    // Verificar se os IDs pertencem ao usuário
+    const creditCard = await Account.findOne({
+      where: { id: creditCardId, userId, type: 'credit' },
+      transaction: t
+    });
+    
+    if (!creditCard) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Cartão de crédito não encontrado' });
+    }
+    
+    const bankAccount = await Account.findOne({
+      where: { id: bankAccountId, userId },
+      transaction: t
+    });
+    
+    if (!bankAccount) {
+      await t.rollback();
+      return res.status(404).json({ message: 'Conta bancária não encontrada' });
+    }
+    
+    // Criar transação de saída da conta bancária
+    const bankTransaction = await Transaction.create({
+      amount,
+      type: 'expense',
+      description: description || 'Pagamento de fatura de cartão de crédito',
+      date,
+      accountId: bankAccountId,
+      categoryId: null,
+      category: 'Cartão de Crédito',
+      account: bankAccount.name,
+      notes: notes || `Pagamento da fatura do cartão ${creditCard.name}`,
+      userId
+    }, { transaction: t });
+    
+    // Criar transação de pagamento no cartão de crédito
+    const creditCardTransaction = await Transaction.create({
+      amount,
+      type: 'income',
+      description: description || 'Pagamento de fatura',
+      date,
+      accountId: creditCardId,
+      categoryId: null,
+      category: 'Pagamento de Fatura',
+      account: creditCard.name,
+      notes: notes || `Pagamento da fatura do cartão`,
+      userId
+    }, { transaction: t });
+    
+    // Atualizar apenas o saldo da conta bancária
+    const bankBalance = parseFloat(bankAccount.balance || 0) - parseFloat(amount);
+    await bankAccount.update({ balance: bankBalance }, { transaction: t });
+    
+    // NÃO atualizar o saldo do cartão de crédito diretamente
+    // O saldo será calculado a partir das transações
+    
+    await t.commit();
+    
+    res.status(200).json({ 
+      message: 'Pagamento da fatura realizado com sucesso',
+      bankTransaction,
+      creditCardTransaction
+    });
+  } catch (error) {
+    await t.rollback();
+    console.error('Erro ao pagar fatura de cartão de crédito:', error);
+    res.status(500).json({ message: 'Erro ao pagar fatura de cartão de crédito', error: error.message });
   }
 };

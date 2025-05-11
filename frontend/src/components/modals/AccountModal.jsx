@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
+const AccountModal = ({ isOpen, onClose, onSubmit, account = null, existingAccounts = [] }) => {
   const [accountType, setAccountType] = useState('');
   const [name, setName] = useState('');
   const [bankName, setBankName] = useState('');
@@ -9,6 +9,13 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
   const [creditLimit, setCreditLimit] = useState('0,00');  // Inicializado com formato de moeda
   const [color, setColor] = useState('indigo');
   const [notes, setNotes] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [linkedAccountId, setLinkedAccountId] = useState('');
+
+  // Lista de contas bancárias disponíveis para vincular ao cartão
+  const bankAccounts = existingAccounts.filter(acc => 
+    acc.type === 'checking' || acc.type === 'savings'
+  );
 
   // Carregar dados quando estiver editando uma conta existente
   useEffect(() => {
@@ -30,6 +37,8 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
       setCreditLimit(formattedCreditLimit);
       setColor(account.color || 'indigo');
       setNotes(account.notes || '');
+      setCardNumber(account.cardNumber || '');
+      setLinkedAccountId(account.linkedAccountId || '');
     } else {
       resetForm();
     }
@@ -44,6 +53,8 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
     setCreditLimit('0,00');  // Valor formatado
     setColor('indigo');
     setNotes('');
+    setCardNumber('');
+    setLinkedAccountId('');
   };
 
   // Função para formatar valores monetários
@@ -58,6 +69,26 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
     return (valueInCents / 100).toFixed(2).replace('.', ',');
   };
   
+  // Função para formatar número do cartão de crédito (XXXX XXXX XXXX XXXX)
+  const formatCardNumber = (value) => {
+    // Remove espaços e caracteres não numéricos
+    const digitsOnly = value.replace(/\D/g, '');
+    
+    // Limita a 16 dígitos
+    const limitedDigits = digitsOnly.slice(0, 16);
+    
+    // Adiciona espaços a cada 4 dígitos
+    let formattedValue = '';
+    for (let i = 0; i < limitedDigits.length; i++) {
+      if (i > 0 && i % 4 === 0) {
+        formattedValue += ' ';
+      }
+      formattedValue += limitedDigits[i];
+    }
+    
+    return formattedValue;
+  };
+  
   // Funções de manipulação de valores monetários
   const handleBalanceChange = (e) => {
     setBalance(formatCurrency(e.target.value));
@@ -65,6 +96,10 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
   
   const handleCreditLimitChange = (e) => {
     setCreditLimit(formatCurrency(e.target.value));
+  };
+
+  const handleCardNumberChange = (e) => {
+    setCardNumber(formatCardNumber(e.target.value));
   };
   
   const handleSubmit = (e) => {
@@ -77,12 +112,14 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
     const accountData = {
       type: accountType,
       name,
-      bankName: bankName || null,
-      accountNumber: accountNumber || null,
+      bankName: accountType !== 'credit' ? bankName : null,
+      accountNumber: accountType !== 'credit' ? accountNumber : null,
       balance: balanceValue,
       creditLimit: accountType === 'credit' ? creditLimitValue : null,
       color,
-      notes
+      notes,
+      cardNumber: accountType === 'credit' ? cardNumber.replace(/\s/g, '') : null,
+      linkedAccountId: accountType === 'credit' ? linkedAccountId : null
     };
     
     onSubmit(accountData);
@@ -95,9 +132,11 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
   };
   
   // Verifica se certos campos devem ser exibidos com base no tipo de conta
-  const shouldShowBankField = accountType === 'checking' || accountType === 'savings' || accountType === 'credit' || accountType === 'investment';
-  const shouldShowAccountNumberField = accountType === 'checking' || accountType === 'savings';
+  const shouldShowBankField = (accountType === 'checking' || accountType === 'savings' || accountType === 'investment') && accountType !== 'credit';
+  const shouldShowAccountNumberField = (accountType === 'checking' || accountType === 'savings') && accountType !== 'credit';
   const shouldShowCreditLimitField = accountType === 'credit';
+  const shouldShowCardNumberField = accountType === 'credit';
+  const shouldShowLinkedAccountField = accountType === 'credit';
   
   if (!isOpen) return null;
   
@@ -136,16 +175,52 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
               
               {/* Account name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome da Conta</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {accountType === 'credit' ? 'Nome do Cartão' : 'Nome da Conta'}
+                </label>
                 <input 
                   type="text" 
                   className="block w-full px-3 py-2 border border-gray-300 dark:border-dark-400 rounded-lg bg-gray-50 dark:bg-dark-300 text-gray-800 dark:text-white focus:ring-primary focus:border-primary dark:focus:ring-indigo-600 transition-theme" 
-                  placeholder="Ex: Conta Nubank" 
+                  placeholder={accountType === 'credit' ? "Ex: Cartão Nubank" : "Ex: Conta Nubank"}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required 
                 />
               </div>
+              
+              {/* Card Number - Novo campo para cartões de crédito */}
+              {shouldShowCardNumberField && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Número do Cartão</label>
+                  <input 
+                    type="text" 
+                    className="block w-full px-3 py-2 border border-gray-300 dark:border-dark-400 rounded-lg bg-gray-50 dark:bg-dark-300 text-gray-800 dark:text-white focus:ring-primary focus:border-primary dark:focus:ring-indigo-600 transition-theme" 
+                    placeholder="XXXX XXXX XXXX XXXX"
+                    value={cardNumber}
+                    onChange={handleCardNumberChange}
+                    maxLength={19}  // 16 dígitos + 3 espaços
+                  />
+                </div>
+              )}
+              
+              {/* Linked Account - Novo campo para vincular cartão a uma conta existente */}
+              {shouldShowLinkedAccountField && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Vincular a Conta</label>
+                  <select 
+                    className="block w-full rounded-lg border-gray-300 dark:border-dark-400 bg-white dark:bg-dark-300 text-gray-800 dark:text-white shadow-sm focus:border-primary focus:ring-primary dark:focus:ring-indigo-600 transition-theme" 
+                    value={linkedAccountId}
+                    onChange={(e) => setLinkedAccountId(e.target.value)}
+                  >
+                    <option value="">Selecione uma conta (opcional)</option>
+                    {bankAccounts.map(account => (
+                      <option key={account.id} value={account.id}>
+                        {account.name} {account.bankName ? `(${account.bankName})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
               {/* Bank name */}
               {shouldShowBankField && (
@@ -178,7 +253,7 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
               {/* Initial balance */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {accountType === 'credit' ? 'Valor da Fatura' : 'Saldo Inicial'}
+                  {accountType === 'credit' ? 'Valor da Fatura Inicial' : 'Saldo Inicial'}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -194,6 +269,11 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
                     required 
                   />
                 </div>
+                {accountType === 'credit' && (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Este valor será adicionado como uma transação de despesa.
+                  </p>
+                )}
               </div>
               
               {/* Credit limit */}
