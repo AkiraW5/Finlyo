@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Financeiro - Dark Mode</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            100: '#E5E7EB',
+                            200: '#D1D5DB',
+                            300: '#9CA3AF',
+                            400: '#6B7280',
+                            500: '#4B5563',
+                            600: '#374151',
+                            700: '#1F2937',
+                            800: '#111827',
+                            900: '#0F172A',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+        
+        .chart-tooltip {
+            background: rgba(31, 41, 55, 0.9);
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            border: 1px solid #374151;
+            color: #E5E7EB;
+        }
+        
+        .dark .chartjs-tooltip-key {
+            background: #E5E7EB !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen text-gray-200">
+    <!-- Theme Toggle -->
+    <div class="fixed bottom-4 right-4 z-50">
+        <button id="themeToggle" class="w-12 h-12 rounded-full bg-gray-800 shadow-lg flex items-center justify-center text-yellow-400 hover:bg-gray-700 transition-colors">
+            <i class="fas fa-moon text-xl"></i>
+        </button>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar fixed inset-y-0 left-0 w-64 bg-gray-800 shadow-md z-40 hidden md:block">
+        <div class="p-4 flex items-center justify-center border-b border-gray-700">
+            <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold">$</div>
+            <h1 class="ml-3 text-xl font-bold text-white">Finanças Pessoais</h1>
+        </div>
+        <nav class="p-4">
+            <ul>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg bg-gray-700 text-indigo-400">
+                        <i class="fas fa-home mr-3"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-exchange-alt mr-3"></i>
+                        <span>Transações</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-chart-pie mr-3"></i>
+                        <span>Orçamentos</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-wallet mr-3"></i>
+                        <span>Contas</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-tags mr-3"></i>
+                        <span>Categorias</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-bullseye mr-3"></i>
+                        <span>Metas</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-cog mr-3"></i>
+                        <span>Configurações</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
+    <!-- Mobile Sidebar -->
+    <div id="mobileSidebar" class="sidebar fixed inset-y-0 left-0 w-64 bg-gray-800 shadow-md z-50 transform -translate-x-full md:hidden">
+        <div class="p-4 flex items-center justify-between border-b border-gray-700">
+            <div class="flex items-center">
+                <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold">$</div>
+                <h1 class="ml-3 text-xl font-bold text-white">Finanças Pessoais</h1>
+            </div>
+            <button id="closeMobileMenu" class="text-gray-400 hover:text-gray-200">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <nav class="p-4">
+            <ul>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg bg-gray-700 text-indigo-400">
+                        <i class="fas fa-home mr-3"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-exchange-alt mr-3"></i>
+                        <span>Transações</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-chart-pie mr-3"></i>
+                        <span>Orçamentos</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-wallet mr-3"></i>
+                        <span>Contas</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-tags mr-3"></i>
+                        <span>Categorias</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-bullseye mr-3"></i>
+                        <span>Metas</span>
+                    </a>
+                </li>
+                <li class="mb-2">
+                    <a href="#" class="flex items-center p-3 rounded-lg text-gray-300 hover:bg-gray-700">
+                        <i class="fas fa-cog mr-3"></i>
+                        <span>Configurações</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-gray-800 shadow-sm fixed top-0 left-0 right-0 z-40 md:left-64 border-b border-gray-700">
+        <div class="px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center">
+                <button id="mobileMenuButton" class="mr-4 text-gray-400 hover:text-gray-200 md:hidden">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h2 class="text-xl font-semibold text-white">Dashboard</h2>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button class="p-2 rounded-full text-gray-400 hover:bg-gray-700 hover:text-gray-200">
+                    <i class="fas fa-bell"></i>
+                </button>
+                <div class="relative">
+                    <button id="userMenuButton" class="flex items-center space-x-2 focus:outline-none">
+                        <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <span class="hidden md:inline text-gray-300">Usuário</span>
+                        <i class="fas fa-chevron-down text-xs text-gray-400"></i>
+                    </button>
+                    <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-lg py-1 z-50 border border-gray-600">
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-600">Perfil</a>
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-600">Configurações</a>
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-600">Sair</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="pt-20 md:ml-64">
+        <div class="p-6">
+            <!-- Header -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Visão Geral</h2>
+                    <p class="text-gray-400">Resumo completo das suas finanças pessoais</p>
+                </div>
+                <div class="mt-4 md:mt-0">
+                    <div class="relative">
+                        <select id="monthSelect" class="appearance-none bg-gray-700 border border-gray-600 rounded-lg pl-4 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-200">
+                            <option value="2023-11">Novembro 2023</option>
+                            <option value="2023-10">Outubro 2023</option>
+                            <option value="2023-09">Setembro 2023</option>
+                            <option value="2023-08">Agosto 2023</option>
+                            <option value="2023-07">Julho 2023</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <!-- Saldo Total -->
+                <div class="bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-700">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-gray-300">Saldo Total</h3>
+                        <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+                            <i class="fas fa-wallet"></i>
+                        </div>
+                    </div>
+                    <p class="text-2xl font-bold mb-4 text-white">R$ 8.245,50</p>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Receitas</span>
+                            <span class="text-green-400 font-medium">+ R$ 12.500,00</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Despesas</span>
+                            <span class="text-red-400 font-medium">- R$ 4.254,50</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Receitas -->
+                <div class="bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-700">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-gray-300">Receitas</h3>
+                        <div class="w-10 h-10 rounded-full bg-green-900 flex items-center justify-center text-green-400">
+                            <i class="fas fa-arrow-up"></i>
+                        </div>
+                    </div>
+                    <p class="text-2xl font-bold mb-4 text-white">R$ 12.500,00</p>
+                    <div class="flex items-center">
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div class="bg-green-500 h-2 rounded-full progress-bar" style="width: 85%"></div>
+                        </div>
+                        <span class="text-xs text-gray-400 ml-2">85% da meta</span>
+                    </div>
+                </div>
+                
+                <!-- Despesas -->
+                <div class="bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-700">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-gray-300">Despesas</h3>
+                        <div class="w-10 h-10 rounded-full bg-red-900 flex items-center justify-center text-red-400">
+                            <i class="fas fa-arrow-down"></i>
+                        </div>
+                    </div>
+                    <p class="text-2xl font-bold mb-4 text-white">R$ 4.254,50</p>
+                    <div class="flex items-center">
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div class="bg-red-500 h-2 rounded-full progress-bar" style="width: 65%"></div>
+                        </div>
+                        <span class="text-xs text-gray-400 ml-2">65% do orçamento</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Taxa de poupança -->
+            <div class="bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-700 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-semibold text-gray-300">Taxa de Poupança</h3>
+                    <span class="px-2 py-1 text-xs rounded-full bg-blue-900 text-blue-400">32,5%</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-2 mb-2">
+                    <div class="rounded-full h-2 bg-blue-500 progress-bar" style="width: 32.5%"></div>
+                </div>
+                <div class="flex text-xs text-gray-400 justify-between">
+                    <span>0%</span>
+                    <span class="text-blue-400 font-medium">Meta: 20%</span>
+                    <span>50%</span>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <!-- Gráfico de Receitas vs Despesas -->
+                <div class="lg:col-span-2 bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-semibold text-gray-300">Receitas vs Despesas</h3>
+                        <div class="flex space-x-2">
+                            <button class="px-3 py-1 text-xs bg-indigo-900 text-indigo-400 rounded-full">Mensal</button>
+                            <button class="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-full">Anual</button>
+                        </div>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="incomeExpenseChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Gráfico de Categorias -->
+                <div class="lg:col-span-1 bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-700">
+                    <h3 class="font-semibold text-gray-300 mb-4">Categorias de Despesas</h3>
+                    <div class="h-64">
+                        <canvas id="categoriesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent transactions and budgets -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Lista de transações recentes -->
+                <div class="lg:col-span-2 bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-semibold text-gray-300">Transações Recentes</h3>
+                        <button id="addTransactionButton" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+                            <i class="fas fa-plus mr-2"></i> Adicionar
+                        </button>
+                    </div>
+                    <div class="space-y-4">
+                        <!-- Transação 1 -->
+                        <div class="flex items-center justify-between p-3 hover:bg-gray-700 rounded-lg transition-colors">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-red-900 flex items-center justify-center text-red-400 mr-3">
+                                    <i class="fas fa-shopping-bag"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-white">Compras no Supermercado</p>
+                                    <p class="text-xs text-gray-400">Alimentação • 15/11/2023</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-medium text-red-400">- R$ 245,90</p>
+                                <p class="text-xs text-gray-400">Cartão de Crédito</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Transação 2 -->
+                        <div class="flex items-center justify-between p-3 hover:bg-gray-700 rounded-lg transition-colors">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-green-900 flex items-center justify-center text-green-400 mr-3">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-white">Salário</p>
+                                    <p class="text-xs text-gray-400">Rendimento • 05/11/2023</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-medium text-green-400">+ R$ 8.500,00</p>
+                                <p class="text-xs text-gray-400">Conta Corrente</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Transação 3 -->
+                        <div class="flex items-center justify-between p-3 hover:bg-gray-700 rounded-lg transition-colors">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-purple-900 flex items-center justify-center text-purple-400 mr-3">
+                                    <i class="fas fa-bullseye"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-white">Investimento Mensal</p>
+                                    <p class="text-xs text-gray-400">Metas • 01/11/2023</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-medium text-red-400">- R$ 1.500,00</p>
+                                <p class="text-xs text-gray-400">Conta Investimento</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Transação 4 -->
+                        <div class="flex items-center justify-between p-3 hover:bg-gray-700 rounded-lg transition-colors">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center text-blue-400 mr-3">
+                                    <i class="fas fa-home"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-white">Aluguel</p>
+                                    <p class="text-xs text-gray-400">Moradia • 01/11/2023</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-medium text-red-400">- R$ 1.800,00</p>
+                                <p class="text-xs text-gray-400">Conta Corrente</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Transação 5 -->
+                        <div class="flex items-center justify-between p-3 hover:bg-gray-700 rounded-lg transition-colors">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-yellow-900 flex items-center justify-center text-yellow-400 mr-3">
+                                    <i class="fas fa-utensils"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-white">Jantar</p>
+                                    <p class="text-xs text-gray-400">Alimentação • 10/11/2023</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-medium text-red-400">- R$ 120,00</p>
+                                <p class="text-xs text-gray-400">Cartão de Crédito</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Lista de orçamentos -->
+                <div class="lg:col-span-1 bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-700">
+                    <h3 class="font-semibold text-gray-300 mb-4">Orçamentos</h3>
+                    <div class="space-y-4">
+                        <!-- Orçamento 1 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-medium text-gray-300">Alimentação</span>
+                                <span class="text-xs text-gray-400">R$ 1.200,00</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div class="bg-red-500 h-2 rounded-full progress-bar" style="width: 75%"></div>
+                            </div>
+                            <div class="flex justify-between mt-1">
+                                <span class="text-xs text-gray-400">R$ 900,00 gastos</span>
+                                <span class="text-xs text-gray-400">75%</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Orçamento 2 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-medium text-gray-300">Transporte</span>
+                                <span class="text-xs text-gray-400">R$ 800,00</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div class="bg-yellow-500 h-2 rounded-full progress-bar" style="width: 45%"></div>
+                            </div>
+                            <div class="flex justify-between mt-1">
+                                <span class="text-xs text-gray-400">R$ 360,00 gastos</span>
+                                <span class="text-xs text-gray-400">45%</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Orçamento 3 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-medium text-gray-300">Lazer</span>
+                                <span class="text-xs text-gray-400">R$ 500,00</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full progress-bar" style="width: 30%"></div>
+                            </div>
+                            <div class="flex justify-between mt-1">
+                                <span class="text-xs text-gray-400">R$ 150,00 gastos</span>
+                                <span class="text-xs text-gray-400">30%</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Orçamento 4 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-medium text-gray-300">Saúde</span>
+                                <span class="text-xs text-gray-400">R$ 300,00</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full progress-bar" style="width: 60%"></div>
+                            </div>
+                            <div class="flex justify-between mt-1">
+                                <span class="text-xs text-gray-400">R$ 180,00 gastos</span>
+                                <span class="text-xs text-gray-400">60%</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Orçamento 5 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-medium text-gray-300">Educação</span>
+                                <span class="text-xs text-gray-400">R$ 400,00</span>
+                            </div>
+                            <div class="w-full bg-gray-700 rounded-full h-2">
+                                <div class="bg-purple-500 h-2 rounded-full progress-bar" style="width: 90%"></div>
+                            </div>
+                            <div class="flex justify-between mt-1">
+                                <span class="text-xs text-gray-400">R$ 360,00 gastos</span>
+                                <span class="text-xs text-gray-400">90%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Transaction Modal -->
+    <div id="transactionModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-900 opacity-75"></div>
+            </div>
+            
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            
+            <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-700">
+                <div class="bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg leading-6 font-medium text-white">Adicionar Transação</h3>
+                                <button id="closeModal" class="text-gray-400 hover:text-gray-200">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <form id="transactionForm">
+                                <div class="grid grid-cols-1 gap-4">
+                                    <div>
+                                        <label for="transactionType" class="block text-sm font-medium text-gray-300">Tipo</label>
+                                        <select id="transactionType" name="type" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-gray-700 text-gray-200">
+                                            <option value="income">Receita</option>
+                                            <option value="expense">Despesa</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="transactionAmount" class="block text-sm font-medium text-gray-300">Valor</label>
+                                        <div class="mt-1 relative rounded-md shadow-sm">
+                                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <span class="text-gray-400 sm:text-sm">R$</span>
+                                            </div>
+                                            <input type="text" name="amount" id="transactionAmount" class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 pr-12 sm:text-sm border-gray-600 rounded-md bg-gray-700 text-gray-200" placeholder="0,00">
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="transactionDescription" class="block text-sm font-medium text-gray-300">Descrição</label>
+                                        <input type="text" name="description" id="transactionDescription" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-600 rounded-md bg-gray-700 text-gray-200">
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="transactionCategory" class="block text-sm font-medium text-gray-300">Categoria</label>
+                                        <select id="transactionCategory" name="category" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-gray-700 text-gray-200">
+                                            <option value="alimentacao">Alimentação</option>
+                                            <option value="moradia">Moradia</option>
+                                            <option value="transporte">Transporte</option>
+                                            <option value="lazer">Lazer</option>
+                                            <option value="saude">Saúde</option>
+                                            <option value="educacao">Educação</option>
+                                            <option value="outros">Outros</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="transactionAccount" class="block text-sm font-medium text-gray-300">Conta</label>
+                                        <select id="transactionAccount" name="account" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-600 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md bg-gray-700 text-gray-200">
+                                            <option value="conta_corrente">Conta Corrente</option>
+                                            <option value="cartao_credito">Cartão de Crédito</option>
+                                            <option value="conta_investimento">Conta Investimento</option>
+                                            <option value="poupanca">Poupança</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="transactionDate" class="block text-sm font-medium text-gray-300">Data</label>
+                                        <input type="date" name="date" id="transactionDate" class="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-600 rounded-md bg-gray-700 text-gray-200">
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" id="submitTransaction" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        Salvar
+                    </button>
+                    <button type="button" id="cancelTransaction" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-600 shadow-sm px-4 py-2 bg-gray-600 text-base font-medium text-white hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobileMenuButton').addEventListener('click', function() {
+            document.getElementById('mobileSidebar').classList.remove('-translate-x-full');
+        });
+
+        document.getElementById('closeMobileMenu').addEventListener('click', function() {
+            document.getElementById('mobileSidebar').classList.add('-translate-x-full');
+        });
+
+        // User menu toggle
+        document.getElementById('userMenuButton').addEventListener('click', function() {
+            document.getElementById('userMenu').classList.toggle('hidden');
+        });
+
+        // Close user menu when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('#userMenuButton') && !event.target.closest('#userMenu')) {
+                document.getElementById('userMenu').classList.add('hidden');
+            }
+        });
+
+        // Transaction modal
+        document.getElementById('addTransactionButton').addEventListener('click', function() {
+            document.getElementById('transactionModal').classList.remove('hidden');
+        });
+
+        document.getElementById('closeModal').addEventListener('click', function() {
+            document.getElementById('transactionModal').classList.add('hidden');
+        });
+
+        document.getElementById('cancelTransaction').addEventListener('click', function() {
+            document.getElementById('transactionModal').classList.add('hidden');
+        });
+
+        document.getElementById('submitTransaction').addEventListener('click', function() {
+            // Here you would normally submit the form data
+            document.getElementById('transactionModal').classList.add('hidden');
+            
+            // Show success notification
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-4 right-4 bg-green-700 text-white px-4 py-2 rounded-lg shadow-lg flex items-center fade-in';
+            notification.innerHTML = `
+                <i class="fas fa-check-circle mr-2"></i>
+                <span>Transação adicionada com sucesso!</span>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 3000);
+        });
+
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const html = document.documentElement;
+        
+        themeToggle.addEventListener('click', function() {
+            html.classList.toggle('dark');
+            
+            if (html.classList.contains('dark')) {
+                themeToggle.innerHTML = '<i class="fas fa-sun text-xl"></i>';
+                localStorage.setItem('theme', 'dark');
+            } else {
+                themeToggle.innerHTML = '<i class="fas fa-moon text-xl"></i>';
+                localStorage.setItem('theme', 'light');
+            }
+            
+            // Update charts when theme changes
+            updateChartsTheme();
+        });
+
+        // Check for saved theme preference
+        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            html.classList.add('dark');
+            themeToggle.innerHTML = '<i class="fas fa-sun text-xl"></i>';
+        } else {
+            html.classList.remove('dark');
+            themeToggle.innerHTML = '<i class="fas fa-moon text-xl"></i>';
+        }
+
+        // Charts
+        // Income vs Expense Chart
+        const incomeExpenseCtx = document.getElementById('incomeExpenseChart').getContext('2d');
+        let incomeExpenseChart = new Chart(incomeExpenseCtx, {
+            type: 'bar',
+            data: {
+                labels: ['1', '5', '10', '15', '20', '25', '30'],
+                datasets: [
+                    {
+                        label: 'Receitas',
+                        data: [1200, 1900, 3000, 5000, 2000, 3000, 4500],
+                        backgroundColor: '#10B981',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Despesas',
+                        data: [800, 1200, 1500, 1800, 1200, 1500, 2000],
+                        backgroundColor: '#EF4444',
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: getDarkChartOptions('Receitas vs Despesas')
+        });
+
+        // Categories Chart
+        const categoriesCtx = document.getElementById('categoriesChart').getContext('2d');
+        let categoriesChart = new Chart(categoriesCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Alimentação', 'Moradia', 'Transporte', 'Lazer', 'Saúde', 'Educação'],
+                datasets: [{
+                    data: [900, 1800, 360, 150, 180, 360],
+                    backgroundColor: [
+                        '#EF4444',
+                        '#3B82F6',
+                        '#F59E0B',
+                        '#10B981',
+                        '#6366F1',
+                        '#8B5CF6'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: getDarkDoughnutOptions()
+        });
+
+        // Function to get dark chart options
+        function getDarkChartOptions(title) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: '#E5E7EB'
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: title,
+                        color: '#E5E7EB',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(31, 41, 55, 0.9)',
+                        titleColor: '#E5E7EB',
+                        bodyColor: '#E5E7EB',
+                        borderColor: '#4B5563',
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 6,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false,
+                            color: 'rgba(107, 114, 128, 0.3)'
+                        },
+                        ticks: {
+                            color: '#D1D5DB'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            borderDash: [4],
+                            drawBorder: false,
+                            color: 'rgba(107, 114, 128, 0.3)'
+                        },
+                        ticks: {
+                            color: '#D1D5DB',
+                            callback: function(value) {
+                                return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Function to get dark doughnut options
+        function getDarkDoughnutOptions() {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 16,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            color: '#E5E7EB'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(31, 41, 55, 0.9)',
+                        titleColor: '#E5E7EB',
+                        bodyColor: '#E5E7EB',
+                        borderColor: '#4B5563',
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 6,
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update charts theme
+        function updateChartsTheme() {
+            // Destroy existing charts
+            incomeExpenseChart.destroy();
+            categoriesChart.destroy();
+            
+            // Recreate charts with updated theme
+            incomeExpenseChart = new Chart(incomeExpenseCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['1', '5', '10', '15', '20', '25', '30'],
+                    datasets: [
+                        {
+                            label: 'Receitas',
+                            data: [1200, 1900, 3000, 5000, 2000, 3000, 4500],
+                            backgroundColor: '#10B981',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Despesas',
+                            data: [800, 1200, 1500, 1800, 1200, 1500, 2000],
+                            backgroundColor: '#EF4444',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: getDarkChartOptions('Receitas vs Despesas')
+            });
+
+            categoriesChart = new Chart(categoriesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Alimentação', 'Moradia', 'Transporte', 'Lazer', 'Saúde', 'Educação'],
+                    datasets: [{
+                        data: [900, 1800, 360, 150, 180, 360],
+                        backgroundColor: [
+                            '#EF4444',
+                            '#3B82F6',
+                            '#F59E0B',
+                            '#10B981',
+                            '#6366F1',
+                            '#8B5CF6'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: getDarkDoughnutOptions()
+            });
+        }
+
+        // Format currency input
+        document.getElementById('transactionAmount').addEventListener('blur', function(e) {
+            const value = e.target.value.replace(/\D/g, '');
+            const formattedValue = (value / 100).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2
+            });
+            e.target.value = formattedValue;
+        });
+    </script>
+</body>
+</html>

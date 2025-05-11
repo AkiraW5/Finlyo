@@ -1,11 +1,17 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import './styles/tailwind.css';
 import App from './App';
 
-ReactDOM.render(
+// Pegando o elemento container
+const container = document.getElementById('root');
+
+// Criando uma raiz React 18
+const root = createRoot(container);
+
+// Renderizando o app nessa raiz
+root.render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>,
-  document.getElementById('root')
+  </React.StrictMode>
 );

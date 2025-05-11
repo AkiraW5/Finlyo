@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
+const User = require('./User');
 
 const Account = sequelize.define('Account', {
   id: {
@@ -7,13 +8,25 @@ const Account = sequelize.define('Account', {
     primaryKey: true,
     autoIncrement: true
   },
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: User,
+      key: 'id'
+    }
+  },
   name: {
     type: DataTypes.STRING,
     allowNull: false
   },
   type: {
-    type: DataTypes.ENUM('checking', 'savings', 'credit', 'investment', 'wallet', 'other'),
+    type: DataTypes.ENUM('checking', 'savings', 'credit', 'investment', 'wallet'),
     allowNull: false
+  },
+  balance: {
+    type: DataTypes.DECIMAL(15, 2),
+    defaultValue: 0
   },
   bankName: {
     type: DataTypes.STRING,
@@ -23,19 +36,13 @@ const Account = sequelize.define('Account', {
     type: DataTypes.STRING,
     allowNull: true
   },
-  balance: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    defaultValue: 0
-  },
-  creditLimit: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true
+  isDefault: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
   color: {
     type: DataTypes.STRING,
-    allowNull: true,
-    defaultValue: 'indigo'
+    defaultValue: '#3B82F6'
   },
   notes: {
     type: DataTypes.TEXT,
@@ -45,5 +52,9 @@ const Account = sequelize.define('Account', {
   tableName: 'accounts',
   timestamps: true
 });
+
+// Definir relacionamento com User
+Account.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(Account, { foreignKey: 'userId' });
 
 module.exports = Account;

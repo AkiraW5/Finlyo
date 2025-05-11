@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const contributionController = require('../controllers/contributionController');
+const { authenticateToken } = require('../middlewares/auth');
+
+// Proteger todas as rotas de contribuições
+router.use(authenticateToken);
 
 // Definição das rotas de contribuições
 router.get('/', contributionController.getAllContributions);

@@ -15,8 +15,9 @@ const budgetRoutes = require('./routes/budgetRoutes');
 const goalRoutes = require('./routes/goalRoutes');
 const accountRoutes = require('./routes/accountRoutes');
 const contributionRoutes = require('./routes/ContributionsRoutes');
-const authRoutes = require('./routes/authRoutes'); // Adicionar importação das rotas de autenticação
-const settingsRoutes = require('./routes/settingsRoutes'); // Adicionar importação das rotas de configurações
+const authRoutes = require('./routes/authRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
+const userRoutes = require('./routes/userRoutes'); // Adicionar importação das rotas de usuário
 
 // Sync sequelize models with database
 (async () => {
@@ -28,8 +29,9 @@ const settingsRoutes = require('./routes/settingsRoutes'); // Adicionar importa�
   }
 })();
 
-// Rotas de autenticação (adicionar antes das outras rotas)
+// Rotas de autenticação e usuário
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes); // Adicionar rotas de usuário
 app.use('/api/settings', settingsRoutes);
 
 // Outras rotas

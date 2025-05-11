@@ -5,8 +5,9 @@ import {
   deleteAccount, 
   updateAccount, 
   getTransactions, 
-  getContributions 
+  getContributions
 } from '../services/api';
+import { useUserSettingsContext } from '../contexts/UserSettingsContext';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import MobileSidebar from './layout/MobileSidebar';
@@ -16,7 +17,7 @@ const Accounts = () => {
   // Estados
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
-  const [contributions, setContributions] = useState([]); // Novo estado para contribuições
+  const [contributions, setContributions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [accountModalOpen, setAccountModalOpen] = useState(false);
@@ -30,6 +31,14 @@ const Accounts = () => {
     incomeChange: 0,
     expenseChange: 0
   });
+  
+  // NOVO: Obter preferências do usuário através do contexto
+  const { 
+    settings, 
+    formatCurrency, 
+    formatDate, 
+    showBalance 
+  } = useUserSettingsContext();
 
   // Buscar contas, transações e contribuições
   useEffect(() => {
@@ -383,18 +392,9 @@ const Accounts = () => {
     }, 3000);
   };
 
-  // Formatar valores monetários - com verificação de tipo
-  const formatCurrency = (value) => {
-    // Garantir que o valor seja um número
-    if (typeof value !== 'number') {
-      value = parseFloat(value) || 0;
-    }
-    return `R$ ${value.toFixed(2).replace('.', ',')}`;
-  };
-
   // Determinar tipo de ícone para a conta
   const getAccountIcon = (type) => {
-    switch(type) {
+    switch (type) {
       case 'checking': return 'landmark';
       case 'savings': return 'piggy-bank';
       case 'credit': return 'credit-card';
@@ -406,7 +406,7 @@ const Accounts = () => {
 
   // Determinar cor de fundo para o ícone da conta
   const getAccountBgColorClass = (type) => {
-    switch(type) {
+    switch (type) {
       case 'checking': return 'account-type-bg';
       case 'savings': return 'savings-type-bg';
       case 'credit': return 'credit-type-bg';
@@ -419,15 +419,30 @@ const Accounts = () => {
   // Determinar cor do texto para o saldo da conta
   const getBalanceColorClass = (type, balance) => {
     if (type === 'credit' || balance < 0) {
-      return 'text-red-600';
+      return 'text-red-600 dark:text-red-400';
     }
-    return balance > 0 ? 'text-green-600' : 'text-gray-800';
+    return balance > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-800 dark:text-white';
+  };
+
+  // Renderização condicional de saldos com base nas preferências
+  const renderBalance = (balance, type) => {
+    // Se usuário não quer ver saldos
+    if (!showBalance) {
+      return <span className="font-semibold text-gray-400 dark:text-gray-500">•••••</span>;
+    }
+    
+    return (
+      <span className={`font-semibold ${getBalanceColorClass(type, balance)}`}>
+        {type === 'credit' && balance > 0 ? '- ' : ''}
+        {formatCurrency(Math.abs(balance))}
+      </span>
+    );
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="spinner-border text-primary" role="status">
+      <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-dark-100">
+        <div className="spinner-border text-primary dark:text-indigo-400" role="status">
           <span className="sr-only">Carregando...</span>
         </div>
       </div>
@@ -438,7 +453,7 @@ const Accounts = () => {
   const recentTransactions = getRecentTransactions();
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 dark:bg-dark-100 min-h-screen transition-theme">
       <Sidebar />
       <Header title="Contas" onMenuClick={() => setMobileMenuOpen(true)} />
       <MobileSidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
@@ -448,13 +463,13 @@ const Accounts = () => {
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">Contas</h2>
-              <p className="text-gray-600">Gerencie todas as suas contas bancárias e carteiras</p>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Contas</h2>
+              <p className="text-gray-600 dark:text-gray-300">Gerencie todas as suas contas bancárias e carteiras</p>
             </div>
             <div className="mt-4 md:mt-0 flex space-x-3">
               <button 
                 onClick={() => {setEditingAccount(null); setAccountModalOpen(true);}}
-                className="bg-primary hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center"
+                className="bg-primary hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-800 text-white px-4 py-2 rounded-lg flex items-center transition-colors"
               >
                 <i className="fas fa-plus mr-2"></i>
                 <span>Adicionar Conta</span>
@@ -465,39 +480,47 @@ const Accounts = () => {
           {/* Summary cards - Usando saldos atualizados */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             {/* Total balance */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="bg-white dark:bg-dark-200 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 transition-theme">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm text-gray-500">Saldo Total</p>
-                  <h3 className="text-2xl font-bold mt-1">{formatCurrency(summary.totalBalance)}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Saldo Total</p>
+                  <h3 className="text-2xl font-bold mt-1 text-gray-800 dark:text-white">
+                    {showBalance 
+                      ? formatCurrency(summary.totalBalance)
+                      : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
+                  </h3>
                 </div>
-                <div className="bg-indigo-100 p-3 rounded-lg">
-                  <i className="fas fa-wallet text-indigo-600"></i>
+                <div className="bg-indigo-100 dark:bg-indigo-900 dark:bg-opacity-30 p-3 rounded-lg">
+                  <i className="fas fa-wallet text-indigo-600 dark:text-indigo-400"></i>
                 </div>
               </div>
-              <div className="mt-4 pt-3 border-t border-gray-100">
+              <div className="mt-4 pt-3 border-t border-gray-100 dark:border-dark-300">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Última atualização</span>
-                  <span className="text-primary font-medium">{new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="text-gray-500 dark:text-gray-400">Última atualização</span>
+                  <span className="text-primary dark:text-indigo-400 font-medium">{new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               </div>
             </div>
             
             {/* Income summary */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="bg-white dark:bg-dark-200 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 transition-theme">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm text-gray-500">Receitas (30 dias)</p>
-                  <h3 className="text-2xl font-bold mt-1 text-green-600">{formatCurrency(summary.totalIncome)}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Receitas (30 dias)</p>
+                  <h3 className="text-2xl font-bold mt-1 text-green-600 dark:text-green-400">
+                    {showBalance 
+                      ? formatCurrency(summary.totalIncome)
+                      : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
+                  </h3>
                 </div>
-                <div className="bg-green-100 p-3 rounded-lg">
-                  <i className="fas fa-arrow-up text-green-600"></i>
+                <div className="bg-green-100 dark:bg-green-900 dark:bg-opacity-30 p-3 rounded-lg">
+                  <i className="fas fa-arrow-up text-green-600 dark:text-green-400"></i>
                 </div>
               </div>
-              <div className="mt-4 pt-3 border-t border-gray-100">
+              <div className="mt-4 pt-3 border-t border-gray-100 dark:border-dark-300">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Comparado ao mês passado</span>
-                  <span className={`font-medium ${summary.incomeChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <span className="text-gray-500 dark:text-gray-400">Comparado ao mês passado</span>
+                  <span className={`font-medium ${summary.incomeChange >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                     {summary.incomeChange >= 0 ? '+ ' : '- '}
                     {Math.abs(summary.incomeChange).toFixed(1)}%
                   </span>
@@ -506,20 +529,24 @@ const Accounts = () => {
             </div>
             
             {/* Expense summary */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="bg-white dark:bg-dark-200 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 transition-theme">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm text-gray-500">Despesas (30 dias)</p>
-                  <h3 className="text-2xl font-bold mt-1 text-red-600">{formatCurrency(summary.totalExpense)}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Despesas (30 dias)</p>
+                  <h3 className="text-2xl font-bold mt-1 text-red-600 dark:text-red-400">
+                    {showBalance 
+                      ? formatCurrency(summary.totalExpense)
+                      : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
+                  </h3>
                 </div>
-                <div className="bg-red-100 p-3 rounded-lg">
-                  <i className="fas fa-arrow-down text-red-600"></i>
+                <div className="bg-red-100 dark:bg-red-900 dark:bg-opacity-30 p-3 rounded-lg">
+                  <i className="fas fa-arrow-down text-red-600 dark:text-red-400"></i>
                 </div>
               </div>
-              <div className="mt-4 pt-3 border-t border-gray-100">
+              <div className="mt-4 pt-3 border-t border-gray-100 dark:border-dark-300">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Comparado ao mês passado</span>
-                  <span className={`font-medium ${summary.expenseChange <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <span className="text-gray-500 dark:text-gray-400">Comparado ao mês passado</span>
+                  <span className={`font-medium ${summary.expenseChange <= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                     {summary.expenseChange <= 0 ? '+ ' : '- '}
                     {Math.abs(summary.expenseChange).toFixed(1)}%
                   </span>
@@ -529,25 +556,25 @@ const Accounts = () => {
           </div>
 
           {/* Accounts list */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+          <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 overflow-hidden mb-6 transition-theme">
             {/* Table header */}
-            <div className="px-6 py-4 border-b flex flex-col md:flex-row justify-between items-start md:items-center">
-              <h3 className="font-semibold text-gray-800 mb-2 md:mb-0">Minhas Contas</h3>
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-dark-300 flex flex-col md:flex-row justify-between items-start md:items-center">
+              <h3 className="font-semibold text-gray-800 dark:text-white mb-2 md:mb-0">Minhas Contas</h3>
               
               <div className="flex items-center space-x-2">
                 <div className="relative">
-                  <select className="appearance-none bg-white border border-gray-300 rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                  <select className="appearance-none bg-white dark:bg-dark-300 border border-gray-300 dark:border-dark-400 rounded-lg pl-3 pr-8 py-2 text-sm text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-indigo-600 focus:border-transparent transition-theme">
                     <option>Ordenar por: Saldo</option>
                     <option>Ordenar por: Nome</option>
                     <option>Ordenar por: Tipo</option>
                   </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
                     <i className="fas fa-chevron-down text-xs"></i>
                   </div>
                 </div>
                 
-                <button className="p-2 rounded-lg hover:bg-gray-100">
-                  <i className="fas fa-download text-gray-500"></i>
+                <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-300 transition-colors">
+                  <i className="fas fa-download text-gray-500 dark:text-gray-400"></i>
                 </button>
               </div>
             </div>
@@ -560,14 +587,25 @@ const Accounts = () => {
                 const currentBalance = getCurrentBalance(account.id);
                 
                 return (
-                  <div key={account.id} className="account-card bg-white border border-gray-200 rounded-xl p-5 transition-all duration-200 cursor-pointer">
+                  <div key={account.id} 
+                       className={`account-card bg-white dark:bg-dark-300 border ${account.isDefault ? 'border-primary dark:border-indigo-500' : 'border-gray-200 dark:border-dark-400'} rounded-xl p-5 transition-all duration-200 cursor-pointer hover:shadow-md dark:hover:border-dark-200`}>
                     <div className="flex justify-between items-start mb-4">
-                      <div className={`${getAccountBgColorClass(account.type)} p-3 rounded-lg`}>
-                        <i className={`fas fa-${getAccountIcon(account.type)} ${account.type === 'credit' ? 'text-red-600' : 'text-primary'} text-xl`}></i>
+                      <div className={`${getAccountBgColorClass(account.type)} p-3 rounded-lg dark:bg-opacity-30`} 
+                           style={account.color ? {backgroundColor: `${account.color}20`} : {}}>
+                        <i className={`fas fa-${getAccountIcon(account.type)} ${account.type === 'credit' ? 'text-red-600 dark:text-red-400' : 'text-primary dark:text-indigo-400'} text-xl`}
+                           style={account.color ? {color: account.color} : {}}></i>
                       </div>
+                      
+                      {/* Indicador de conta padrão */}
+                      {account.isDefault && (
+                        <span className="bg-primary bg-opacity-10 dark:bg-indigo-900 dark:bg-opacity-30 text-primary dark:text-indigo-400 text-xs font-medium px-2 py-1 rounded-full">
+                          Padrão
+                        </span>
+                      )}
+                      
                       <div className="dropdown relative">
                         <button 
-                          className="text-gray-400 hover:text-gray-600 focus:outline-none" 
+                          className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none transition-colors" 
                           onClick={(e) => {
                             e.stopPropagation(); // Evita que o evento de clique propague
                             toggleDropdown(account.id);
@@ -575,38 +613,35 @@ const Accounts = () => {
                         >
                           <i className="fas fa-ellipsis-v"></i>
                         </button>
-                        <div className={`dropdown-menu absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg z-10 ${activeDropdown === account.id ? 'block' : 'hidden'}`}>
-                          <button onClick={() => handleEditAccount(account)} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        <div className={`dropdown-menu absolute right-0 mt-2 w-40 bg-white dark:bg-dark-200 rounded-md shadow-lg z-10 ${activeDropdown === account.id ? 'block' : 'hidden'}`}>
+                          <button onClick={() => handleEditAccount(account)} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-300 transition-colors">
                             Editar
                           </button>
-                          <a href={`/transactions?account=${account.id}`} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                          <a href={`/transactions?account=${account.id}`} className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-300 transition-colors">
                             Transações
                           </a>
-                          <button onClick={() => handleDeleteAccount(account.id)} className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
+                          <button onClick={() => handleDeleteAccount(account.id)} className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-dark-300 transition-colors">
                             Excluir
                           </button>
                         </div>
                       </div>
                     </div>
-                    <h4 className="font-semibold text-gray-800 mb-1">{account.name}</h4>
-                    <p className="text-sm text-gray-500 mb-4">
+                    <h4 className="font-semibold text-gray-800 dark:text-white mb-1">{account.name}</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                       {account.bankName && `${account.bankName} `}
                       {account.accountNumber && `•••• ${account.accountNumber.slice(-4)}`}
                     </p>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">
+                      <span className="text-gray-600 dark:text-gray-300 text-sm">
                         {account.type === 'credit' ? 'Fatura atual' : 'Saldo atual'}
                       </span>
-                      <span className={`font-semibold ${getBalanceColorClass(account.type, currentBalance)}`}>
-                        {account.type === 'credit' && currentBalance > 0 ? '- ' : ''}
-                        {formatCurrency(Math.abs(currentBalance))}
-                      </span>
+                      {renderBalance(currentBalance, account.type)}
                     </div>
                   </div>
                 );
               }) : (
-                <div className="col-span-3 py-8 flex flex-col items-center text-gray-500">
-                  <i className="fas fa-wallet text-gray-300 text-5xl mb-4"></i>
+                <div className="col-span-3 py-8 flex flex-col items-center text-gray-500 dark:text-gray-400">
+                  <i className="fas fa-wallet text-gray-300 dark:text-gray-600 text-5xl mb-4"></i>
                   <p>Você ainda não possui contas cadastradas.</p>
                 </div>
               )}
@@ -614,52 +649,52 @@ const Accounts = () => {
               {/* Add new account card */}
               <div 
                 onClick={() => {setEditingAccount(null); setAccountModalOpen(true);}}
-                className="flex items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-5 hover:border-primary hover:bg-indigo-50 transition-all duration-200 cursor-pointer"
+                className="flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-dark-400 rounded-xl p-5 hover:border-primary dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900 dark:hover:bg-opacity-10 transition-all duration-200 cursor-pointer"
               >
                 <div className="text-center">
-                  <div className="mx-auto bg-indigo-100 w-12 h-12 rounded-full flex items-center justify-center mb-3">
-                    <i className="fas fa-plus text-primary text-xl"></i>
+                  <div className="mx-auto bg-indigo-100 dark:bg-indigo-900 dark:bg-opacity-30 w-12 h-12 rounded-full flex items-center justify-center mb-3">
+                    <i className="fas fa-plus text-primary dark:text-indigo-400 text-xl"></i>
                   </div>
-                  <h4 className="font-semibold text-gray-800">Adicionar nova conta</h4>
+                  <h4 className="font-semibold text-gray-800 dark:text-white">Adicionar nova conta</h4>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Recent transactions */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-4 border-b flex flex-col md:flex-row justify-between items-start md:items-center">
-              <h3 className="font-semibold text-gray-800 mb-2 md:mb-0">Transações Recentes</h3>
-              <a href="/transactions" className="text-primary hover:text-indigo-700 text-sm font-medium">Ver todas</a>
+          <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 overflow-hidden transition-theme">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-dark-300 flex flex-col md:flex-row justify-between items-start md:items-center">
+              <h3 className="font-semibold text-gray-800 dark:text-white mb-2 md:mb-0">Transações Recentes</h3>
+              <a href="/transactions" className="text-primary hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm font-medium transition-colors">Ver todas</a>
             </div>
             
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 dark:divide-dark-300">
               {recentTransactions.length > 0 ? (
                 recentTransactions.map((item) => {
                   const isContribution = item.isContribution;
                   
                   return (
-                    <div key={item.id} className="hover:bg-gray-50">
+                    <div key={item.id} className="hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors">
                       <div className="px-6 py-4 flex items-center justify-between">
                         <div className="flex items-center">
-                          <div className={`${isContribution ? 'bg-blue-100' : 
-                            item.type === 'income' ? 'bg-green-100' : 'bg-red-100'} p-3 rounded-lg mr-4`}>
-                            <i className={`fas fa-${isContribution ? 'bullseye' : getCategoryIcon(item.category)} 
-                              ${isContribution ? 'text-blue-600' : 
-                                item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}></i>
+                          <div className={`${isContribution ? 'bg-blue-100 dark:bg-blue-900 dark:bg-opacity-30 text-blue-600 dark:text-blue-400' : 
+                            item.type === 'income' ? 'bg-green-100 dark:bg-green-900 dark:bg-opacity-30 text-green-600 dark:text-green-400' : 'bg-red-100 dark:bg-red-900 dark:bg-opacity-30 text-red-600 dark:text-red-400'} p-3 rounded-lg mr-4`}>
+                            <i className={`fas fa-${isContribution ? 'bullseye' : getCategoryIcon(item.category)}`}></i>
                           </div>
                           <div>
-                            <h4 className="font-medium">{item.description}</h4>
-                            <p className="text-sm text-gray-500">
-                              {getAccountNameById(item.accountId)} • {new Date(item.date).toLocaleDateString('pt-BR')}
+                            <h4 className="font-medium text-gray-800 dark:text-white">{item.description}</h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {getAccountNameById(item.accountId)} • {formatDate(item.date)}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className={`font-medium ${isContribution ? 'text-blue-600' : 
-                            item.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                          <p className={`font-medium ${isContribution ? 'text-blue-600 dark:text-blue-400' : 
+                            item.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                             {isContribution ? '- ' : item.type === 'income' ? '+ ' : '- '}
-                            {formatCurrency(item.amount)}
+                            {showBalance 
+                              ? formatCurrency(item.amount)
+                              : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
                           </p>
                         </div>
                       </div>
@@ -667,9 +702,9 @@ const Accounts = () => {
                   );
                 })
               ) : (
-                <div className="px-6 py-8 text-center text-gray-500">
+                <div className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                   <p>Nenhuma transação recente encontrada.</p>
-                  <a href="/transactions" className="text-primary hover:underline mt-2 inline-block">
+                  <a href="/transactions" className="text-primary dark:text-indigo-400 hover:underline mt-2 inline-block transition-colors">
                     Adicionar uma transação
                   </a>
                 </div>

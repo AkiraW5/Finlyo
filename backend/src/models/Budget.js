@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 const Category = require('./Category');
+const User = require('./User');
 
 const Budget = sequelize.define('Budget', {
   id: {
@@ -8,51 +9,65 @@ const Budget = sequelize.define('Budget', {
     primaryKey: true,
     autoIncrement: true
   },
-  categoryId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'categories',
-      key: 'id'
-    }
-  },
-  category: {
-    type: DataTypes.STRING,
-    allowNull: false
-  },
   amount: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.DECIMAL(15, 2),
     allowNull: false
   },
   period: {
-    type: DataTypes.STRING,
-    allowNull: false
-  },
-  type: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    defaultValue: 'expense',
-    validate: {
-      isIn: [['expense', 'income', 'goal']]
-    }
+    type: DataTypes.ENUM('daily', 'weekly', 'monthly', 'yearly'),
+    defaultValue: 'monthly'
   },
   startDate: {
     type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+    allowNull: true
   },
   endDate: {
-    type: DataTypes.DATE
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  type: {
+    type: DataTypes.ENUM('income', 'expense', 'goal'),
+    defaultValue: 'expense'
+  },
+  categoryId: {
+    type: DataTypes.INTEGER,
+    references: {
+      model: 'categories',
+      key: 'id'
+    },
+    allowNull: true
+  },
+  category: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  icon: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  color: {
+    type: DataTypes.STRING,
+    allowNull: true
   },
   notes: {
     type: DataTypes.TEXT,
-    defaultValue: ''
+    allowNull: true
+  },
+  userId: {  // Adicionando campo para referência ao usuário
+    type: DataTypes.INTEGER,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    allowNull: false
   }
 }, {
   tableName: 'budgets',
   timestamps: true
 });
 
-// Definir associação com Category
+// Definir associações
 Budget.belongsTo(Category, { foreignKey: 'categoryId' });
+Budget.belongsTo(User, { foreignKey: 'userId' });  // Adicionar associação com usuário
 
 module.exports = Budget;

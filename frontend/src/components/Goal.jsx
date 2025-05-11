@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  getGoals,           // Substituir getBudgets 
-  createGoal,         // Substituir createBudget
-  updateGoal,         // Substituir updateBudget
-  deleteGoal,         // Substituir deleteBudget
+  getGoals,
+  createGoal,
+  updateGoal,
+  deleteGoal,
   getTransactions, 
   getAccounts, 
   getContributions, 
   createContribution, 
   deleteContribution
 } from '../services/api';
+import { useUserSettingsContext } from '../contexts/UserSettingsContext';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import MobileSidebar from './layout/MobileSidebar';
@@ -34,6 +35,14 @@ const Goals = () => {
     nearCompletion: 0,
     totalSaved: 0
   });
+  
+  // NOVO: Obter preferências do usuário através do contexto
+  const { 
+    settings, 
+    formatCurrency, 
+    formatDate, 
+    showBalance 
+  } = useUserSettingsContext();
 
   // Buscar dados quando o componente montar
   useEffect(() => {
@@ -177,12 +186,14 @@ const Goals = () => {
     return 'blue'; // Cor padrão
   };
 
-  // Formatar valores monetários
-  const formatCurrency = (value) => {
-    if (typeof value !== 'number') {
-      value = parseFloat(value) || 0;
+  // Renderização condicional para exibir valores
+  const renderAmount = (amount) => {
+    // Se usuário não quer ver valores
+    if (!showBalance) {
+      return <span className="font-semibold text-gray-400 dark:text-gray-500">•••••</span>;
     }
-    return `R$ ${value.toFixed(2).replace('.', ',')}`;
+    
+    return formatCurrency(amount);
   };
 
   // Toggle dropdown
@@ -264,7 +275,6 @@ const Goals = () => {
     }
   };
     
-
   // Obter contribuições recentes para uma meta ou todas
   const getRecentContributions = (goalId = null) => {
     // Filtrar contribuições pela meta, se especificada
@@ -306,6 +316,12 @@ const Goals = () => {
       console.error("Erro ao salvar meta:", error);
       showNotification('Erro ao salvar meta!', 'error');
     }
+  };
+
+  // Editar meta
+  const handleEditGoal = (goal) => {
+    setEditingGoal(goal);
+    setGoalModalOpen(true);
   };
 
   // Excluir meta
@@ -388,8 +404,8 @@ const Goals = () => {
   // Loading state
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="spinner-border text-primary" role="status">
+      <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-dark-100">
+        <div className="spinner-border text-primary dark:text-indigo-400" role="status">
           <span className="sr-only">Carregando...</span>
         </div>
       </div>
@@ -397,7 +413,7 @@ const Goals = () => {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 dark:bg-dark-100 min-h-screen transition-theme">
       <Sidebar />
       <Header title="Metas Financeiras" onMenuClick={() => setMobileMenuOpen(true)} />
       <MobileSidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
@@ -407,13 +423,13 @@ const Goals = () => {
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">Metas Financeiras</h2>
-              <p className="text-gray-600">Acompanhe suas metas e objetivos financeiros</p>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Metas Financeiras</h2>
+              <p className="text-gray-600 dark:text-gray-300">Acompanhe suas metas e objetivos financeiros</p>
             </div>
             <div className="mt-4 md:mt-0 flex space-x-3">
               <button 
                 onClick={() => {setEditingGoal(null); setGoalModalOpen(true);}}
-                className="bg-primary hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center"
+                className="bg-primary hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-800 text-white px-4 py-2 rounded-lg flex items-center transition-colors"
               >
                 <i className="fas fa-plus mr-2"></i>
                 <span>Nova Meta</span>
@@ -422,22 +438,22 @@ const Goals = () => {
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 mb-6">
+          <div className="flex border-b border-gray-200 dark:border-dark-300 mb-6">
             <button 
               onClick={() => setActiveTab('active')}
-              className={`px-4 py-2 font-medium text-sm border-b-2 ${activeTab === 'active' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-2 font-medium text-sm border-b-2 ${activeTab === 'active' ? 'border-primary text-primary dark:text-indigo-400 dark:border-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
             >
               Ativas
             </button>
             <button 
               onClick={() => setActiveTab('completed')}
-              className={`px-4 py-2 font-medium text-sm border-b-2 ${activeTab === 'completed' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-2 font-medium text-sm border-b-2 ${activeTab === 'completed' ? 'border-green-500 text-green-600 dark:text-green-400 dark:border-green-500' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
             >
               Concluídas
             </button>
             <button 
               onClick={() => setActiveTab('failed')}
-              className={`px-4 py-2 font-medium text-sm border-b-2 ${activeTab === 'failed' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-2 font-medium text-sm border-b-2 ${activeTab === 'failed' ? 'border-red-500 text-red-600 dark:text-red-400 dark:border-red-500' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
             >
               Não alcançadas
             </button>
@@ -445,37 +461,41 @@ const Goals = () => {
 
           {/* Stats cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white dark:bg-dark-200 border border-gray-200 dark:border-dark-300 rounded-xl p-4 transition-theme">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Metas ativas</p>
-                  <h3 className="text-2xl font-bold text-gray-800">{goalSummary.activeCount}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Metas ativas</p>
+                  <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{goalSummary.activeCount}</h3>
                 </div>
-                <div className="bg-indigo-100 p-3 rounded-lg text-indigo-600">
+                <div className="bg-indigo-100 dark:bg-indigo-900 dark:bg-opacity-30 p-3 rounded-lg text-indigo-600 dark:text-indigo-400">
                   <i className="fas fa-bullseye"></i>
                 </div>
               </div>
             </div>
             
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white dark:bg-dark-200 border border-gray-200 dark:border-dark-300 rounded-xl p-4 transition-theme">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Próximo da meta</p>
-                  <h3 className="text-2xl font-bold text-gray-800">{goalSummary.nearCompletion}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Próximo da meta</p>
+                  <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{goalSummary.nearCompletion}</h3>
                 </div>
-                <div className="bg-green-100 p-3 rounded-lg text-green-600">
+                <div className="bg-green-100 dark:bg-green-900 dark:bg-opacity-30 p-3 rounded-lg text-green-600 dark:text-green-400">
                   <i className="fas fa-trophy"></i>
                 </div>
               </div>
             </div>
             
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white dark:bg-dark-200 border border-gray-200 dark:border-dark-300 rounded-xl p-4 transition-theme">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Valor acumulado</p>
-                  <h3 className="text-2xl font-bold text-gray-800">{formatCurrency(goalSummary.totalSaved)}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Valor acumulado</p>
+                  <h3 className="text-2xl font-bold text-gray-800 dark:text-white">
+                    {showBalance 
+                      ? formatCurrency(goalSummary.totalSaved)
+                      : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
+                  </h3>
                 </div>
-                <div className="bg-blue-100 p-3 rounded-lg text-blue-600">
+                <div className="bg-blue-100 dark:bg-blue-900 dark:bg-opacity-30 p-3 rounded-lg text-blue-600 dark:text-blue-400">
                   <i className="fas fa-coins"></i>
                 </div>
               </div>
@@ -487,14 +507,14 @@ const Goals = () => {
             {/* Render goals */}
             {filteredGoals().length > 0 ? (
               filteredGoals().map(goal => (
-                <div key={goal.id} className="goal-card bg-white border border-gray-200 rounded-xl p-5 transition-all duration-200 cursor-pointer hover:shadow-md">
+                <div key={goal.id} className="goal-card bg-white dark:bg-dark-200 border border-gray-200 dark:border-dark-300 rounded-xl p-5 transition-all duration-200 cursor-pointer hover:shadow-md">
                   <div className="flex justify-between items-start mb-4">
-                    <div className={`goal-icon bg-${goal.color}-100 text-${goal.color}-600 w-12 h-12 flex items-center justify-center rounded-xl`}>
+                    <div className={`goal-icon bg-${goal.color}-100 dark:bg-${goal.color}-900 dark:bg-opacity-30 text-${goal.color}-600 dark:text-${goal.color}-400 w-12 h-12 flex items-center justify-center rounded-xl`}>
                       <i className={`fas fa-${goal.icon}`}></i>
                     </div>
                     <div className="dropdown relative">
                       <button 
-                        className="text-gray-400 hover:text-gray-600 focus:outline-none" 
+                        className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none" 
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleDropdown(goal.id);
@@ -502,58 +522,66 @@ const Goals = () => {
                       >
                         <i className="fas fa-ellipsis-v"></i>
                       </button>
-                      <div className={`dropdown-menu absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg z-10 ${activeDropdown === goal.id ? 'block' : 'hidden'}`}>
-                        <button onClick={() => handleEditGoal(goal)} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                      <div className={`dropdown-menu absolute right-0 mt-2 w-40 bg-white dark:bg-dark-200 rounded-md shadow-lg z-10 ${activeDropdown === goal.id ? 'block' : 'hidden'}`}>
+                        <button onClick={() => handleEditGoal(goal)} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-300">
                           Editar
                         </button>
-                        <button onClick={() => handleOpenContributionModal(goal)} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        <button onClick={() => handleOpenContributionModal(goal)} className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-300">
                           Adicionar valor
                         </button>
-                        <button onClick={() => handleDeleteGoal(goal.id)} className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
+                        <button onClick={() => handleDeleteGoal(goal.id)} className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-dark-300">
                           Excluir
                         </button>
                       </div>
                     </div>
                   </div>
-                  <h4 className="font-semibold text-gray-800 mb-1">{goal.category}</h4>
-                  <p className="text-sm text-gray-500 mb-4">{goal.description || `Meta para ${goal.category}`}</p>
+                  <h4 className="font-semibold text-gray-800 dark:text-white mb-1">{goal.category}</h4>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{goal.description || `Meta para ${goal.category}`}</p>
                   
                   <div className="mb-3">
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-600">Progresso</span>
-                      <span className="font-medium">{goal.progress.toFixed(0)}%</span>
+                      <span className="text-gray-600 dark:text-gray-400">Progresso</span>
+                      <span className="font-medium dark:text-white">{goal.progress.toFixed(0)}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 dark:bg-dark-300 rounded-full h-2">
                       <div 
-                        className={`progress-bar bg-${goal.color}-500 rounded-full h-2`} 
+                        className={`progress-bar bg-${goal.color}-500 dark:bg-${goal.color}-600 rounded-full h-2`} 
                         style={{ width: `${Math.min(goal.progress, 100)}%`, transition: 'width 0.5s ease' }}
                       ></div>
                     </div>
                   </div>
                   
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600 text-sm">Arrecadado</span>
-                    <span className="font-semibold">{formatCurrency(goal.saved)}</span>
+                    <span className="text-gray-600 dark:text-gray-400 text-sm">Arrecadado</span>
+                    <span className="font-semibold dark:text-white">
+                      {showBalance 
+                        ? formatCurrency(goal.saved)
+                        : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600 text-sm">Meta</span>
-                    <span className="font-semibold">{formatCurrency(goal.limit)}</span>
+                    <span className="text-gray-600 dark:text-gray-400 text-sm">Meta</span>
+                    <span className="font-semibold dark:text-white">
+                      {showBalance 
+                        ? formatCurrency(goal.limit)
+                        : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">Prazo</span>
-                    <span className="font-semibold">{new Date(goal.deadline).toLocaleDateString('pt-BR')}</span>
+                    <span className="text-gray-600 dark:text-gray-400 text-sm">Prazo</span>
+                    <span className="font-semibold dark:text-white">{formatDate(goal.deadline)}</span>
                   </div>
                   
                   <div className="mt-4">
-                    <span className={`inline-block px-2 py-1 text-xs font-medium rounded-xl bg-${goal.color}-100 text-${goal.color}-800`}>
+                    <span className={`inline-block px-2 py-1 text-xs font-medium rounded-xl bg-${goal.color}-100 dark:bg-${goal.color}-900 dark:bg-opacity-30 text-${goal.color}-800 dark:text-${goal.color}-300`}>
                       {goal.category}
                     </span>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="col-span-3 py-8 flex flex-col items-center text-gray-500">
-                <i className="fas fa-bullseye text-gray-300 text-5xl mb-4"></i>
+              <div className="col-span-3 py-8 flex flex-col items-center text-gray-500 dark:text-gray-400">
+                <i className="fas fa-bullseye text-gray-300 dark:text-gray-600 text-5xl mb-4"></i>
                 <p>Nenhuma meta encontrada para esta categoria.</p>
               </div>
             )}
@@ -561,52 +589,56 @@ const Goals = () => {
             {/* Add new goal card */}
             <div 
               onClick={() => {setEditingGoal(null); setGoalModalOpen(true);}}
-              className="flex items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-5 hover:border-primary hover:bg-indigo-50 transition-all duration-200 cursor-pointer"
+              className="flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-dark-400 rounded-xl p-5 hover:border-primary dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900 dark:hover:bg-opacity-10 transition-all duration-200 cursor-pointer"
             >
               <div className="text-center">
-                <div className="mx-auto bg-indigo-100 w-12 h-12 rounded-full flex items-center justify-center mb-3">
-                  <i className="fas fa-plus text-primary text-xl"></i>
+                <div className="mx-auto bg-indigo-100 dark:bg-indigo-900 dark:bg-opacity-30 w-12 h-12 rounded-full flex items-center justify-center mb-3">
+                  <i className="fas fa-plus text-primary dark:text-indigo-400 text-xl"></i>
                 </div>
-                <h4 className="font-semibold text-gray-800">Nova meta</h4>
+                <h4 className="font-semibold text-gray-800 dark:text-white">Nova meta</h4>
               </div>
             </div>
           </div>
 
           {/* Recent contributions */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-4 border-b flex flex-col md:flex-row justify-between items-start md:items-center">
-              <h3 className="font-semibold text-gray-800 mb-2 md:mb-0">Contribuições Recentes</h3>
-              <button className="text-primary hover:text-indigo-700 text-sm font-medium">Ver histórico</button>
+          <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 overflow-hidden transition-theme">
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-dark-300 flex flex-col md:flex-row justify-between items-start md:items-center">
+              <h3 className="font-semibold text-gray-800 dark:text-white mb-2 md:mb-0">Contribuições Recentes</h3>
+              <button className="text-primary dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-sm font-medium">Ver histórico</button>
             </div>
             
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 dark:divide-dark-300">
               {getRecentContributions().length > 0 ? (
                 getRecentContributions().map(contribution => {
                   const goal = goals.find(g => g.id === contribution.budgetId);
                   
                   return (
-                    <div key={contribution.id} className="hover:bg-gray-50">
+                    <div key={contribution.id} className="hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors">
                       <div className="px-6 py-4 flex items-center justify-between">
                         <div className="flex items-center">
-                          <div className={`bg-${goal?.color || 'blue'}-100 p-3 rounded-lg mr-4 text-${goal?.color || 'blue'}-600`}>
+                          <div className={`bg-${goal?.color || 'blue'}-100 dark:bg-${goal?.color || 'blue'}-900 dark:bg-opacity-30 p-3 rounded-lg mr-4 text-${goal?.color || 'blue'}-600 dark:text-${goal?.color || 'blue'}-400`}>
                             <i className={`fas fa-${goal?.icon || 'bullseye'}`}></i>
                           </div>
                           <div>
-                            <h4 className="font-medium">{goal?.category || 'Meta'}</h4>
-                            <p className="text-sm text-gray-500">
-                              {new Date(contribution.date).toLocaleDateString('pt-BR')} • {contribution.notes || 'Depósito'}
+                            <h4 className="font-medium dark:text-white">{goal?.category || 'Meta'}</h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {formatDate(contribution.date)} • {contribution.notes || 'Depósito'}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-medium text-green-600">+ {formatCurrency(contribution.amount)}</p>
+                          <p className="font-medium text-green-600 dark:text-green-400">+ 
+                            {showBalance 
+                              ? formatCurrency(contribution.amount)
+                              : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
+                          </p>
                         </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteContribution(contribution.id, contribution.budgetId);
                           }}
-                          className="text-gray-400 hover:text-red-500 transition-colors"
+                          className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                           title="Excluir Contribuição"
                           >
                             <i className="fas fa-trash-alt"></i>
@@ -616,11 +648,11 @@ const Goals = () => {
                   );
                 })
               ) : (
-                <div className="px-6 py-8 text-center text-gray-500">
+                <div className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                   <p>Nenhuma contribuição encontrada.</p>
                   <button 
                     onClick={() => setContributionModalOpen(true)}
-                    className="text-primary hover:underline mt-2 inline-block"
+                    className="text-primary dark:text-indigo-400 hover:underline mt-2 inline-block"
                   >
                     Adicionar uma contribuição
                   </button>
@@ -637,6 +669,7 @@ const Goals = () => {
         onClose={() => {setGoalModalOpen(false); setEditingGoal(null);}}
         onSubmit={handleAddGoal}
         goal={editingGoal}
+        formatCurrency={formatCurrency}
       />
       
       {/* Contribution Modal */}
@@ -647,10 +680,10 @@ const Goals = () => {
         goals={goals}
         selectedGoal={selectedGoal}
         accounts={accounts}
+        formatCurrency={formatCurrency}
       />
     </div>
   );
 };
 
-// Exportar o componente sem comentários JSX após a instrução de exportação
 export default Goals;

@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext'; // Importar o contexto de autenticação
-
-
+import { useAuth } from '../../contexts/AuthContext';
 
 const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) => {
   const [transactionType, setTransactionType] = useState('income');
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState('0,00');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -28,50 +26,48 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
     notes: ''
   });
 
-    // Resetar o formulário quando o modal é aberto
-    useEffect(() => {
-      if (isOpen) {
-        setFormData({
-          description: '',
-          amount: '',
-          type: 'expense',
-          categoryId: categories.length > 0 ? categories[0].id : '',
-          accountId: accounts.length > 0 ? accounts[0].id : '',
-          date: new Date().toISOString().substr(0, 10),
-          notes: ''
-        });
-      }
-    }, [isOpen, accounts, categories]);
-
-    
-
-  // Função para censurar o número da conta
-  const maskAccountNumber = (accountNumber) => {
-    if (!accountNumber) return "";
-    // Mostra apenas os últimos 4 dígitos do número da conta
-    return "•••• " + accountNumber.slice(-4);
-  };
-  
-  // Formata a exibição da conta com banco na frente e número censurado
-  const formatAccountDisplay = (account) => {
-    // Se não tiver número da conta ou banco, usa o nome da conta
-    if (!account.accountNumber && !account.bankName) {
-      return account.name;
+  // Resetar o formulário quando o modal é aberto
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        description: '',
+        amount: '',
+        type: 'expense',
+        categoryId: categories.length > 0 ? categories[0].id : '',
+        accountId: accounts.length > 0 ? accounts[0].id : '',
+        date: new Date().toISOString().substr(0, 10),
+        notes: ''
+      });
+      setAmount('0,00'); // Inicializar com valor formatado
+      setTransactionType('expense');
+      setDescription('');
+      setCategory('');
+      setCategoryId(categories.length > 0 ? categories[0].id : '');
+      setDate(new Date().toISOString().substr(0, 10));
+      setAccount('');
+      setAccountId(accounts.length > 0 ? accounts[0].id : '');
+      setNotes('');
     }
+  }, [isOpen, accounts, categories]);
+
+  // Função para formatar o valor como moeda brasileira
+  const handleAmountChange = (e) => {
+    // Obtém apenas os dígitos da entrada
+    const digitsOnly = e.target.value.replace(/\D/g, '');
     
-    const bankName = account.bankName || "";
-    const maskedNumber = account.accountNumber ? maskAccountNumber(account.accountNumber) : "";
+    // Converte para centavos (inteiro)
+    const valueInCents = parseInt(digitsOnly || '0', 10);
     
-    // Formato: Banco - •••• 1234
-    return bankName && maskedNumber 
-      ? `${bankName} - ${maskedNumber}`
-      : bankName || account.name;
+    // Converte centavos para o formato de moeda: R$ 0,00
+    const formattedValue = (valueInCents / 100).toFixed(2).replace('.', ',');
+    
+    setAmount(formattedValue);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Garantir que o valor é numérico
+    // Garantir que o valor é numérico (converte de vírgula para ponto)
     const formattedAmount = parseFloat(amount.replace(',', '.')) || 0;
     
     // Criar objeto de transação
@@ -88,14 +84,11 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
     };
     
     onSubmit(transactionData);
-    
-    // Resetar formulário
-    resetForm();
   };
   
   const resetForm = () => {
     setTransactionType('income');
-    setAmount('');
+    setAmount('0,00');
     setDescription('');
     setCategory('');
     setCategoryId('');
@@ -142,6 +135,29 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
     onClose();
   };
   
+  // Função para censurar o número da conta
+  const maskAccountNumber = (accountNumber) => {
+    if (!accountNumber) return "";
+    // Mostra apenas os últimos 4 dígitos do número da conta
+    return "•••• " + accountNumber.slice(-4);
+  };
+  
+  // Formata a exibição da conta com banco na frente e número censurado
+  const formatAccountDisplay = (account) => {
+    // Se não tiver número da conta ou banco, usa o nome da conta
+    if (!account.accountNumber && !account.bankName) {
+      return account.name;
+    }
+    
+    const bankName = account.bankName || "";
+    const maskedNumber = account.accountNumber ? maskAccountNumber(account.accountNumber) : "";
+    
+    // Formato: Banco - •••• 1234
+    return bankName && maskedNumber 
+      ? `${bankName} - ${maskedNumber}`
+      : bankName || account.name;
+  };
+  
   if (!isOpen) return null;
   
   // Filtrar categorias por tipo (receita/despesa)
@@ -152,10 +168,10 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="text-lg font-semibold text-gray-800">Adicionar Transação</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+      <div className="bg-white dark:bg-dark-200 rounded-xl shadow-xl w-full max-w-md transition-theme">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-300">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Adicionar Transação</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 transition-colors">
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -163,12 +179,14 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 gap-4">
               {/* Transaction type toggle */}
-              <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+              <div className="flex rounded-lg border border-gray-200 dark:border-dark-400 overflow-hidden">
                 <button 
                   type="button" 
                   className={`flex-1 py-2 px-4 text-sm font-medium focus:outline-none ${
-                    transactionType === 'income' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-700'
-                  } border-r border-gray-200`}
+                    transactionType === 'income' ? 
+                    'bg-green-50 dark:bg-green-900 dark:bg-opacity-20 text-green-700 dark:text-green-400' : 
+                    'bg-gray-100 dark:bg-dark-300 text-gray-700 dark:text-gray-300'
+                  } border-r border-gray-200 dark:border-dark-400 transition-theme`}
                   onClick={() => {
                     setTransactionType('income');
                     // Resetar categoria quando trocar o tipo
@@ -181,8 +199,10 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
                 <button 
                   type="button" 
                   className={`flex-1 py-2 px-4 text-sm font-medium focus:outline-none ${
-                    transactionType === 'expense' ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-700'
-                  }`}
+                    transactionType === 'expense' ? 
+                    'bg-red-50 dark:bg-red-900 dark:bg-opacity-20 text-red-700 dark:text-red-400' : 
+                    'bg-gray-100 dark:bg-dark-300 text-gray-700 dark:text-gray-300'
+                  } transition-theme`}
                   onClick={() => {
                     setTransactionType('expense');
                     // Resetar categoria quando trocar o tipo
@@ -196,18 +216,18 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
               
               {/* Amount */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valor</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500">R$</span>
+                    <span className="text-gray-500 dark:text-gray-400">R$</span>
                   </div>
                   <input 
                     type="text"
-                    pattern="[0-9]*[.,]?[0-9]+"
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-primary focus:border-primary" 
+                    inputMode="numeric" 
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-400 rounded-lg bg-gray-50 dark:bg-dark-300 text-gray-800 dark:text-white focus:ring-primary focus:border-primary dark:focus:ring-indigo-600 transition-theme" 
                     placeholder="0,00" 
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={handleAmountChange}
                     required 
                   />
                 </div>
@@ -215,10 +235,10 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
               
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrição</label>
                 <input 
                   type="text" 
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-primary focus:border-primary" 
+                  className="block w-full px-3 py-2 border border-gray-300 dark:border-dark-400 rounded-lg bg-gray-50 dark:bg-dark-300 text-gray-800 dark:text-white focus:ring-primary focus:border-primary dark:focus:ring-indigo-600 transition-theme" 
                   placeholder="Ex: Supermercado" 
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -228,9 +248,9 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
               
               {/* Category */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Categoria</label>
                 <select 
-                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring-primary" 
+                  className="block w-full rounded-lg border-gray-300 dark:border-dark-400 bg-white dark:bg-dark-300 text-gray-800 dark:text-white shadow-sm focus:border-primary focus:ring-primary dark:focus:ring-indigo-600 transition-theme" 
                   value={categoryId}
                   onChange={handleCategoryChange}
                   required
@@ -264,10 +284,10 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
               
               {/* Date */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data</label>
                 <input 
                   type="date" 
-                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring-primary" 
+                  className="block w-full rounded-lg border-gray-300 dark:border-dark-400 bg-white dark:bg-dark-300 text-gray-800 dark:text-white shadow-sm focus:border-primary focus:ring-primary dark:focus:ring-indigo-600 transition-theme" 
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   required 
@@ -276,9 +296,9 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
               
               {/* Account - FORMATO ATUALIZADO: banco e número censurado */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Conta</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Conta</label>
                 <select 
-                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring-primary" 
+                  className="block w-full rounded-lg border-gray-300 dark:border-dark-400 bg-white dark:bg-dark-300 text-gray-800 dark:text-white shadow-sm focus:border-primary focus:ring-primary dark:focus:ring-indigo-600 transition-theme" 
                   value={accountId}
                   onChange={handleAccountChange}
                   required
@@ -304,10 +324,10 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
               
               {/* Notes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notas (Opcional)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notas (Opcional)</label>
                 <textarea 
                   rows="2" 
-                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring-primary" 
+                  className="block w-full rounded-lg border-gray-300 dark:border-dark-400 bg-white dark:bg-dark-300 text-gray-800 dark:text-white shadow-sm focus:border-primary focus:ring-primary dark:focus:ring-indigo-600 transition-theme" 
                   placeholder="Detalhes adicionais..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -319,13 +339,13 @@ const TransactionModal = ({ isOpen, onClose, onSubmit, accounts, categories }) =
               <button 
                 type="button" 
                 onClick={handleCancel}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 dark:border-dark-400 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors"
               >
                 Cancelar
               </button>
               <button 
                 type="submit" 
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-indigo-700"
+                className="px-4 py-2 bg-primary dark:bg-indigo-700 text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-800 transition-colors"
               >
                 Salvar Transação
               </button>

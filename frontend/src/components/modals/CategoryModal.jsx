@@ -86,22 +86,22 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, category = null, defaultType
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-                <div className="flex items-center justify-between p-4 border-b">
-                    <h3 className="text-lg font-semibold text-gray-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 modal-overlay">
+            <div className="modal w-full max-w-md">
+                <div className="modal-header">
+                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
                         {category ? 'Editar Categoria' : 'Nova Categoria'}
                     </h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-300">
                         <i className="fas fa-times"></i>
                     </button>
                 </div>
-                <div className="p-6">
+                <div className="modal-body">
                     <form onSubmit={handleSubmit}>
                         <div className="grid grid-cols-1 gap-4">
                             {/* Category type */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Categoria</label>
+                                <label className="form-label">Tipo de Categoria</label>
                                 <div className="flex space-x-4">
                                     <label className="inline-flex items-center">
                                         <input 
@@ -110,9 +110,9 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, category = null, defaultType
                                             value="expense" 
                                             checked={categoryType === 'expense'}
                                             onChange={() => setCategoryType('expense')}
-                                            className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300"
+                                            className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 dark:border-dark-300 dark:bg-dark-200"
                                         />
-                                        <span className="ml-2 text-gray-700">Despesa</span>
+                                        <span className="ml-2 text-gray-700 dark:text-gray-300">Despesa</span>
                                     </label>
                                     <label className="inline-flex items-center">
                                         <input 
@@ -121,19 +121,19 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, category = null, defaultType
                                             value="income"
                                             checked={categoryType === 'income'} 
                                             onChange={() => setCategoryType('income')}
-                                            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                                            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 dark:border-dark-300 dark:bg-dark-200"
                                         />
-                                        <span className="ml-2 text-gray-700">Receita</span>
+                                        <span className="ml-2 text-gray-700 dark:text-gray-300">Receita</span>
                                     </label>
                                 </div>
                             </div>
                             
                             {/* Category name */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Categoria</label>
+                                <label className="form-label">Nome da Categoria</label>
                                 <input 
                                     type="text" 
-                                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-primary focus:border-primary" 
+                                    className="form-input" 
                                     placeholder="Ex: Alimentação"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
@@ -143,10 +143,10 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, category = null, defaultType
                             
                             {/* Category description */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                                <label className="form-label">Descrição</label>
                                 <input 
                                     type="text" 
-                                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-primary focus:border-primary" 
+                                    className="form-input" 
                                     placeholder="Ex: Supermercado, restaurantes, etc."
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
@@ -155,17 +155,21 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, category = null, defaultType
                             
                             {/* Category icon */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Ícone</label>
+                                <label className="form-label">Ícone</label>
                                 <div className="grid grid-cols-6 gap-2">
                                     {availableIcons.map((iconOption) => (
                                         <button
                                             key={iconOption.name}
                                             type="button"
-                                            className={`p-2 rounded-lg hover:bg-gray-100 border-2 ${icon === iconOption.name ? 'border-indigo-500' : 'border-transparent'}`}
+                                            className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-300 border-2 ${
+                                                icon === iconOption.name 
+                                                    ? 'border-indigo-500 dark:border-indigo-400' 
+                                                    : 'border-transparent'
+                                            }`}
                                             onClick={() => setIcon(iconOption.name)}
                                             title={iconOption.label}
                                         >
-                                            <i className={`fas ${iconOption.name} text-gray-700`}></i>
+                                            <i className={`fas ${iconOption.name} text-gray-700 dark:text-gray-300`}></i>
                                         </button>
                                     ))}
                                 </div>
@@ -173,13 +177,17 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, category = null, defaultType
                             
                             {/* Color picker */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cor</label>
+                                <label className="form-label">Cor</label>
                                 <div className="flex space-x-2">
                                     {availableColors.map((colorOption) => (
                                         <button
                                             key={colorOption.name}
                                             type="button"
-                                            className={`w-8 h-8 rounded-full bg-${colorOption.name}-500 border-2 ${color === colorOption.name ? `border-${colorOption.name}-700` : 'border-transparent'} focus:outline-none`}
+                                            className={`w-8 h-8 rounded-full bg-${colorOption.name}-500 border-2 ${
+                                                color === colorOption.name 
+                                                    ? `border-${colorOption.name}-700 dark:border-${colorOption.name}-300` 
+                                                    : 'border-transparent'
+                                            } focus:outline-none`}
                                             onClick={() => setColor(colorOption.name)}
                                             title={colorOption.label}
                                         ></button>
@@ -189,9 +197,9 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, category = null, defaultType
                             
                             {/* Parent category */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria Pai (Opcional)</label>
+                                <label className="form-label">Categoria Pai (Opcional)</label>
                                 <select 
-                                    className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                                    className="form-input"
                                     value={parentCategory}
                                     onChange={(e) => setParentCategory(e.target.value)}
                                 >
@@ -202,10 +210,10 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, category = null, defaultType
                             
                             {/* Notes */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Notas (Opcional)</label>
+                                <label className="form-label">Notas (Opcional)</label>
                                 <textarea 
                                     rows="2" 
-                                    className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring-primary" 
+                                    className="form-input" 
                                     placeholder="Detalhes adicionais sobre esta categoria..."
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
@@ -217,13 +225,13 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, category = null, defaultType
                             <button 
                                 type="button" 
                                 onClick={handleCancel}
-                                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                                className="btn btn-outline"
                             >
                                 Cancelar
                             </button>
                             <button 
                                 type="submit" 
-                                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-indigo-700"
+                                className="btn btn-primary"
                             >
                                 {category ? 'Salvar Alterações' : 'Salvar Categoria'}
                             </button>

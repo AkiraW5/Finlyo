@@ -5,6 +5,7 @@ import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import MobileSidebar from './layout/MobileSidebar';
 import { getTransactions, getAccounts, getBudgets, getCategories, getContributions } from '../services/api';
+import { useUserSettingsContext } from '../contexts/UserSettingsContext';
 
 const Reports = () => {
     // Estados
@@ -20,6 +21,7 @@ const Reports = () => {
     const [budgets, setBudgets] = useState([]);
     const [categories, setCategories] = useState([]);
     const [contributions, setContributions] = useState([]);
+    const [incomeExpenseView, setIncomeExpenseView] = useState('monthly'); // 'monthly' ou 'yearly'
     
     // Estados para estatísticas de sumário
     const [summary, setSummary] = useState({
@@ -41,6 +43,14 @@ const Reports = () => {
       budgetStatus: [],
       savingsRate: 0
     });
+    
+    // NOVO: Obter preferências do usuário através do contexto
+    const { 
+        settings, 
+        formatCurrency, 
+        formatDate, 
+        showBalance 
+    } = useUserSettingsContext();
     
     // Referências para os gráficos
     const incomeExpenseChartRef = useRef(null);
@@ -96,23 +106,19 @@ const Reports = () => {
         const filteredTransactions = filterTransactionsByPeriod(transactions, selectedPeriod);
         const filteredContributions = filterTransactionsByPeriod(contributions, selectedPeriod);
         
-        // Preparar dados para o gráfico de receitas vs despesas
-        const monthlyData = getMonthlyData(filteredTransactions);
+        // Preparar dados para o gráfico de receitas vs despesas usando a nova função
+        const chartDataResult = getChartData(filteredTransactions);
         
         // Preparar dados para o gráfico de despesas por categoria
         const categoryData = getCategoryData(filteredTransactions, filteredContributions, categories);
-        
-        // Preparar dados para o status de orçamento
         const budgetStatus = getBudgetStatus(filteredTransactions, budgets);
-        
-        // Calcular taxa de poupança
         const savingsRate = calculateSavingsRate(filteredTransactions, filteredContributions);
-        
+    
         setChartData({
-            monthlyLabels: monthlyData.labels,
-            incomeData: monthlyData.incomeData,
-            expenseData: monthlyData.expenseData,
-            balanceData: monthlyData.balanceData,
+            monthlyLabels: chartDataResult.labels,
+            incomeData: chartDataResult.incomeData,
+            expenseData: chartDataResult.expenseData,
+            balanceData: chartDataResult.balanceData,
             categoryData: categoryData,
             budgetStatus: budgetStatus,
             savingsRate: savingsRate
@@ -126,7 +132,7 @@ const Reports = () => {
         const now = new Date();
         let startDate = new Date();
         
-        switch(period) {
+        switch (period) {
             case 'last7days':
                 startDate.setDate(now.getDate() - 7);
                 break;
@@ -164,6 +170,54 @@ const Reports = () => {
     };
 
     // Obter dados mensais para o gráfico de receitas vs despesas
+    const getChartData = (transactions) => {
+        if (incomeExpenseView === 'monthly') {
+            return getMonthlyData(transactions);
+        } else {
+            return getYearlyData(transactions);
+        }
+    };
+
+    const getYearlyData = (transactions) => {
+        if (!transactions || transactions.length === 0) {
+            return { labels: [], incomeData: [], expenseData: [], balanceData: [] };
+        }
+        
+        // Obter o ano atual e alguns anos anteriores
+        const currentYear = new Date().getFullYear();
+        const years = [currentYear - 4, currentYear - 3, currentYear - 2, currentYear - 1, currentYear];
+        
+        // Inicializar arrays para dados anuais
+        const yearlyIncome = Array(years.length).fill(0);
+        const yearlyExpense = Array(years.length).fill(0);
+        
+        transactions.forEach(tx => {
+            const txDate = new Date(tx.date);
+            const txYear = txDate.getFullYear();
+            
+            // Verificar se o ano da transação está em nossa lista de anos
+            const yearIndex = years.indexOf(txYear);
+            if (yearIndex !== -1) {
+                if (tx.type === 'income') {
+                    yearlyIncome[yearIndex] += parseFloat(tx.amount || 0);
+                } else {
+                    yearlyExpense[yearIndex] += parseFloat(tx.amount || 0);
+                }
+            }
+        });
+
+        // Calcular saldo anual (receitas - despesas)
+        const yearlyBalance = yearlyIncome.map((income, idx) => income - yearlyExpense[idx]);
+        
+        return {
+            labels: years.map(year => year.toString()),
+            incomeData: yearlyIncome,
+            expenseData: yearlyExpense,
+            balanceData: yearlyBalance
+        };
+    };
+
+    // Obter dados mensais para o gráfico de receitas vs despesas
     const getMonthlyData = (transactions) => {
         const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         const currentYear = new Date().getFullYear();
@@ -181,10 +235,10 @@ const Reports = () => {
                 }
             }
         });
-        
-        // Calcular saldo mensal (receitas - despesas)
+
+        // Calcular saldo mensal (receita - despesa)
         const monthlyBalance = monthlyIncome.map((income, idx) => income - monthlyExpense[idx]);
-        
+    
         return {
             labels: months,
             incomeData: monthlyIncome,
@@ -254,21 +308,42 @@ const Reports = () => {
         return budgets
             .filter(budget => budget.type !== 'goal') // Filtrar apenas orçamentos normais, não metas
             .map(budget => {
-                // Calcular quanto foi gasto desta categoria no período atual
-                const spent = transactions
-                    .filter(tx => tx.type === 'expense' && tx.category === budget.category)
+                // Obter o tipo do orçamento (receita ou despesa)
+                // Verifica tanto budgetType quanto type para compatibilidade
+                const budgetType = budget.budgetType || budget.type || 'expense';
+                
+                // Calcular quanto foi gasto/recebido desta categoria no período atual
+                const amount = transactions
+                    .filter(tx => {
+                        // Verifica se a transação corresponde ao tipo do orçamento E à categoria do orçamento
+                        return tx.type === budgetType && tx.category === budget.category;
+                    })
                     .reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
                 
                 const budgetAmount = parseFloat(budget.amount || 0);
-                const remaining = Math.max(0, budgetAmount - spent);
-                const percentage = budgetAmount > 0 ? (spent / budgetAmount) * 100 : 0;
+                
+                // Cálculo de restante e porcentagem diferenciado por tipo
+                let remaining, percentage;
+                
+                if (budgetType === 'income') {
+                    // Para receitas: quanto ainda falta receber
+                    remaining = Math.max(0, budgetAmount - amount);
+                    // Porcentagem do quanto já foi recebido
+                    percentage = budgetAmount > 0 ? (amount / budgetAmount) * 100 : 0;
+                } else {
+                    // Para despesas: quanto ainda pode gastar
+                    remaining = Math.max(0, budgetAmount - amount);
+                    // Porcentagem do quanto já foi gasto
+                    percentage = budgetAmount > 0 ? (amount / budgetAmount) * 100 : 0;
+                }
                 
                 return {
                     category: budget.category,
-                    spent,
-                    budgetAmount,
-                    remaining,
-                    percentage
+                    spent: amount, // Valor gasto ou recebido
+                    budgetAmount,  // Valor orçado
+                    remaining,     // Valor restante (diferente interpretação para receitas/despesas)
+                    percentage,    // Porcentagem de progresso
+                    budgetType     // Tipo do orçamento para usar na UI
                 };
             });
     };
@@ -316,7 +391,7 @@ const Reports = () => {
         
         // Obter dados do período anterior
         let previousPeriod;
-        switch(selectedPeriod) {
+        switch (selectedPeriod) {
             case 'thisMonth':
                 previousPeriod = 'lastMonth';
                 break;
@@ -372,13 +447,13 @@ const Reports = () => {
             balanceChange: balanceChange
         });
     };
-
-    // Formatação de moeda
-    const formatCurrency = (value) => {
-        return `R$ ${Number(value).toLocaleString('pt-BR', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        })}`;
+    
+    // Renderização condicional para valores monetários
+    const renderCurrency = (value) => {
+        if (!showBalance) {
+            return <span className="text-gray-400 dark:text-gray-500">•••••</span>;
+        }
+        return formatCurrency(value);
     };
 
     // Inicializar gráficos
@@ -419,6 +494,9 @@ const Reports = () => {
                     plugins: {
                         legend: {
                             position: 'top',
+                            labels: {
+                                color: document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#374151'
+                            }
                         },
                         tooltip: {
                             callbacks: {
@@ -438,18 +516,24 @@ const Reports = () => {
                     scales: {
                         x: {
                             grid: {
-                                display: false
+                                display: false,
+                                color: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb'
+                            },
+                            ticks: {
+                                color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563'
                             }
                         },
                         y: {
                             beginAtZero: true,
                             grid: {
-                                drawBorder: false
+                                drawBorder: false,
+                                color: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb'
                             },
                             ticks: {
                                 callback: function(value) {
                                     return 'R$ ' + value.toLocaleString('pt-BR');
-                                }
+                                },
+                                color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563'
                             }
                         }
                     }
@@ -488,6 +572,9 @@ const Reports = () => {
                     plugins: {
                         legend: {
                             position: 'right',
+                            labels: {
+                                color: document.documentElement.classList.contains('dark') ? '#e5e7eb' : '#374151'
+                            }
                         },
                         tooltip: {
                             callbacks: {
@@ -526,7 +613,7 @@ const Reports = () => {
                         data: [savingsPercentage, spendingPercentage],
                         backgroundColor: [
                             '#4f46e5',
-                            '#e5e7eb'
+                            document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb'
                         ],
                         borderWidth: 0
                     }]
@@ -627,18 +714,24 @@ const Reports = () => {
                 scales: {
                     x: {
                         grid: {
-                            display: false
+                            display: false,
+                            color: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb'
+                        },
+                        ticks: {
+                            color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563'
                         }
                     },
                     y: {
                         beginAtZero: false,
                         grid: {
-                            drawBorder: false
+                            drawBorder: false,
+                            color: document.documentElement.classList.contains('dark') ? '#374151' : '#e5e7eb'
                         },
                         ticks: {
                             callback: function(value) {
                                 return 'R$ ' + value.toLocaleString('pt-BR');
-                            }
+                            },
+                            color: document.documentElement.classList.contains('dark') ? '#9ca3af' : '#4b5563'
                         }
                     }
                 }
@@ -652,23 +745,16 @@ const Reports = () => {
 
     // Atualizar gráfico quando a aba muda
     useEffect(() => {
-        if (!loading && chartData.monthlyLabels.length) {
-            updateMonthlyTrendChart();
+        if (!loading && transactions.length > 0) {
+            processDataForCharts(transactions, accounts, budgets, contributions, categories);
         }
-        
-        return () => {
-            if (monthlyTrendChartInstance.current) {
-                monthlyTrendChartInstance.current.destroy();
-                monthlyTrendChartInstance.current = null;
-            }
-        };
-    }, [activeMonthlyTab, chartData]);
+    }, [incomeExpenseView]); // Dependência no incomeExpenseView
 
     // Mostrar indicador de carregamento
     if (loading) {
         return (
-            <div className="flex justify-center items-center h-screen">
-                <div className="spinner-border text-primary" role="status">
+            <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-dark-100">
+                <div className="spinner-border text-primary dark:text-indigo-400" role="status">
                     <span className="sr-only">Carregando...</span>
                 </div>
             </div>
@@ -678,8 +764,8 @@ const Reports = () => {
     // Mostrar mensagem de erro se houver
     if (error) {
         return (
-            <div className="flex justify-center items-center h-screen">
-                <div className="text-red-600 text-center">
+            <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-dark-100">
+                <div className="text-red-600 dark:text-red-400 text-center">
                     <p className="text-xl font-bold mb-2">Erro ao carregar dados</p>
                     <p>{error}</p>
                 </div>
@@ -688,7 +774,7 @@ const Reports = () => {
     }
 
     return (
-        <div className="bg-gray-50 min-h-screen">
+        <div className="bg-gray-50 dark:bg-dark-100 min-h-screen transition-theme">
             <Sidebar />
             <Header title="Relatórios" onMenuClick={() => setMobileMenuOpen(true)} />
             <MobileSidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
@@ -698,15 +784,15 @@ const Reports = () => {
                     {/* Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-800">Relatórios Financeiros</h2>
-                            <p className="text-gray-600">Análise detalhada de suas finanças</p>
+                            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Relatórios Financeiros</h2>
+                            <p className="text-gray-600 dark:text-gray-300">Análise detalhada de suas finanças</p>
                         </div>
                         <div className="mt-4 md:mt-0 flex space-x-3">
-                            <button className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg flex items-center hover:bg-gray-50">
+                            <button className="bg-white dark:bg-dark-200 border border-gray-300 dark:border-dark-400 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg flex items-center hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors">
                                 <i className="fas fa-download mr-2"></i>
                                 <span>Exportar</span>
                             </button>
-                            <button className="bg-primary hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center">
+                            <button className="bg-primary hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-800 text-white px-4 py-2 rounded-lg flex items-center transition-colors">
                                 <i className="fas fa-filter mr-2"></i>
                                 <span>Filtrar</span>
                             </button>
@@ -714,12 +800,12 @@ const Reports = () => {
                     </div>
 
                     {/* Date range selector */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+                    <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 p-4 mb-6 transition-theme">
                         <div className="flex flex-col md:flex-row items-center justify-between">
                             <div className="flex items-center mb-4 md:mb-0">
-                                <h3 className="font-medium mr-3">Período:</h3>
+                                <h3 className="font-medium text-gray-800 dark:text-white mr-3">Período:</h3>
                                 <select 
-                                    className="border border-gray-300 rounded-lg px-3 py-1 bg-gray-50 focus:ring-primary focus:border-primary"
+                                    className="border border-gray-300 dark:border-dark-400 rounded-lg px-3 py-1 bg-gray-50 dark:bg-dark-300 text-gray-800 dark:text-white focus:ring-primary dark:focus:ring-indigo-600 focus:border-primary dark:focus:border-indigo-500 transition-theme"
                                     value={selectedPeriod}
                                     onChange={(e) => setSelectedPeriod(e.target.value)}
                                 >
@@ -733,11 +819,11 @@ const Reports = () => {
                                 </select>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <button className="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                <button className="px-3 py-1 border border-gray-300 dark:border-dark-400 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors">
                                     <i className="fas fa-chevron-left"></i>
                                 </button>
-                                <span className="font-medium">{new Date().toLocaleString('pt-BR', {month: 'long', year: 'numeric'})}</span>
-                                <button className="px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                <span className="font-medium text-gray-800 dark:text-white">{new Date().toLocaleString('pt-BR', {month: 'long', year: 'numeric'})}</span>
+                                <button className="px-3 py-1 border border-gray-300 dark:border-dark-400 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors">
                                     <i className="fas fa-chevron-right"></i>
                                 </button>
                             </div>
@@ -746,67 +832,91 @@ const Reports = () => {
 
                     {/* Summary cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div className="report-card bg-white border border-gray-200 rounded-xl p-4 transition-all duration-200">
+                        <div className="report-card bg-white dark:bg-dark-200 border border-gray-200 dark:border-dark-300 rounded-xl p-4 transition-all duration-200">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-gray-500">Receitas</p>
-                                    <h3 className="text-2xl font-bold text-green-600">{formatCurrency(summary.income)}</h3>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        <span className={summary.incomeChange >= 0 ? "text-green-600" : "text-red-600"}>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">Receitas</p>
+                                    <h3 className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                        {renderCurrency(summary.income)}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        <span className={`${summary.incomeChange >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                                             {summary.incomeChange >= 0 ? "+" : "-"}{Math.abs(summary.incomeChange).toFixed(1)}%
                                         </span> em relação ao período anterior
                                     </p>
                                 </div>
-                                <div className="bg-green-100 p-3 rounded-lg text-green-600">
+                                <div className="bg-green-100 dark:bg-green-900 dark:bg-opacity-30 p-3 rounded-lg text-green-600 dark:text-green-400">
                                     <i className={`fas fa-arrow-${summary.incomeChange >= 0 ? 'up' : 'down'}`}></i>
                                 </div>
                             </div>
                         </div>
                         
-                        <div className="report-card bg-white border border-gray-200 rounded-xl p-4 transition-all duration-200">
+                        <div className="report-card bg-white dark:bg-dark-200 border border-gray-200 dark:border-dark-300 rounded-xl p-4 transition-all duration-200">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-gray-500">Despesas</p>
-                                    <h3 className="text-2xl font-bold text-red-600">{formatCurrency(summary.expense)}</h3>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        <span className={summary.expenseChange <= 0 ? "text-green-600" : "text-red-600"}>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">Despesas</p>
+                                    <h3 className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                        {renderCurrency(summary.expense)}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        <span className={`${summary.expenseChange <= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                                             {summary.expenseChange >= 0 ? "+" : "-"}{Math.abs(summary.expenseChange).toFixed(1)}%
                                         </span> em relação ao período anterior
                                     </p>
                                 </div>
-                                <div className="bg-red-100 p-3 rounded-lg text-red-600">
+                                <div className="bg-red-100 dark:bg-red-900 dark:bg-opacity-30 p-3 rounded-lg text-red-600 dark:text-red-400">
                                     <i className={`fas fa-arrow-${summary.expenseChange >= 0 ? 'up' : 'down'}`}></i>
                                 </div>
                             </div>
                         </div>
                         
-                        <div className="report-card bg-white border border-gray-200 rounded-xl p-4 transition-all duration-200">
+                        <div className="report-card bg-white dark:bg-dark-200 border border-gray-200 dark:border-dark-300 rounded-xl p-4 transition-all duration-200">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-gray-500">Saldo</p>
-                                    <h3 className="text-2xl font-bold text-primary">{formatCurrency(summary.balance)}</h3>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        <span className={summary.balanceChange >= 0 ? "text-green-600" : "text-red-600"}>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">Saldo</p>
+                                    <h3 className="text-2xl font-bold text-primary dark:text-indigo-400">
+                                        {renderCurrency(summary.balance)}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        <span className={`${summary.balanceChange >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                                             {summary.balanceChange >= 0 ? "+" : "-"}{Math.abs(summary.balanceChange).toFixed(1)}%
                                         </span> em relação ao período anterior
                                     </p>
                                 </div>
-                                <div className="bg-indigo-100 p-3 rounded-lg text-primary">
+                                <div className="bg-indigo-100 dark:bg-indigo-900 dark:bg-opacity-30 p-3 rounded-lg text-primary dark:text-indigo-400">
                                     <i className={`fas fa-arrow-${summary.balanceChange >= 0 ? 'up' : 'down'}`}></i>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Charts section */}
+                    {/* Grid para os dois gráficos principais */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                         {/* Income vs Expenses chart */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 p-4 transition-theme">
                             <div className="flex justify-between items-center mb-4">
-                                <h3 className="font-semibold text-gray-800">Receitas vs Despesas</h3>
+                                <h3 className="font-semibold text-gray-800 dark:text-white">Receitas vs Despesas</h3>
                                 <div className="flex space-x-2">
-                                    <button className="px-2 py-1 text-xs bg-indigo-50 text-primary rounded hover:bg-indigo-100">Mensal</button>
-                                    <button className="px-2 py-1 text-xs bg-white text-gray-600 border border-gray-200 rounded hover:bg-gray-50">Anual</button>
+                                    <button 
+                                        className={`px-2 py-1 text-xs ${incomeExpenseView === 'monthly' ? 'bg-indigo-50 dark:bg-indigo-900 dark:bg-opacity-30 text-primary dark:text-indigo-400' : 'bg-white dark:bg-dark-300 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-dark-400'} rounded hover:bg-indigo-100 dark:hover:bg-dark-300`}
+                                        onClick={() => {
+                                            setIncomeExpenseView('monthly');
+                                            // Reprocessar dados após mudar a visualização
+                                            processDataForCharts(transactions, accounts, budgets, contributions, categories);
+                                        }}
+                                    >
+                                        Mensal
+                                    </button>
+                                    <button 
+                                        className={`px-2 py-1 text-xs ${incomeExpenseView === 'yearly' ? 'bg-indigo-50 dark:bg-indigo-900 dark:bg-opacity-30 text-primary dark:text-indigo-400' : 'bg-white dark:bg-dark-300 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-dark-400'} rounded hover:bg-indigo-100 dark:hover:bg-dark-300`}
+                                        onClick={() => {
+                                            setIncomeExpenseView('yearly');
+                                            // Reprocessar dados após mudar a visualização
+                                            processDataForCharts(transactions, accounts, budgets, contributions, categories);
+                                        }}
+                                    >
+                                        Anual
+                                    </button>
                                 </div>
                             </div>
                             <div className="chart-container" style={{height: '300px'}}>
@@ -815,10 +925,10 @@ const Reports = () => {
                         </div>
                         
                         {/* Expenses by category chart */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 p-4 transition-theme">
                             <div className="flex justify-between items-center mb-4">
-                                <h3 className="font-semibold text-gray-800">Despesas por Categoria</h3>
-                                <button className="text-gray-400 hover:text-gray-600">
+                                <h3 className="font-semibold text-gray-800 dark:text-white">Despesas por Categoria</h3>
+                                <button className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
                                     <i className="fas fa-ellipsis-v"></i>
                                 </button>
                             </div>
@@ -829,24 +939,24 @@ const Reports = () => {
                     </div>
 
                     {/* Monthly trends */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+                    <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 p-4 mb-6 transition-theme">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-semibold text-gray-800">Tendência Mensal</h3>
+                            <h3 className="font-semibold text-gray-800 dark:text-white">Tendência Mensal</h3>
                             <div className="flex space-x-2">
                                 <button 
-                                    className={`px-2 py-1 text-xs ${activeMonthlyTab === 'income' ? 'bg-indigo-50 text-primary' : 'bg-white text-gray-600 border border-gray-200'} rounded hover:bg-indigo-100`}
+                                    className={`px-2 py-1 text-xs ${activeMonthlyTab === 'income' ? 'bg-indigo-50 dark:bg-indigo-900 dark:bg-opacity-30 text-primary dark:text-indigo-400' : 'bg-white dark:bg-dark-300 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-dark-400'} rounded hover:bg-indigo-100 dark:hover:bg-dark-300`}
                                     onClick={() => setActiveMonthlyTab('income')}
                                 >
                                     Receitas
                                 </button>
                                 <button 
-                                    className={`px-2 py-1 text-xs ${activeMonthlyTab === 'expense' ? 'bg-indigo-50 text-primary' : 'bg-white text-gray-600 border border-gray-200'} rounded hover:bg-indigo-100`}
+                                    className={`px-2 py-1 text-xs ${activeMonthlyTab === 'expense' ? 'bg-indigo-50 dark:bg-indigo-900 dark:bg-opacity-30 text-primary dark:text-indigo-400' : 'bg-white dark:bg-dark-300 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-dark-400'} rounded hover:bg-indigo-100 dark:hover:bg-dark-300`}
                                     onClick={() => setActiveMonthlyTab('expense')}
                                 >
                                     Despesas
                                 </button>
                                 <button 
-                                    className={`px-2 py-1 text-xs ${activeMonthlyTab === 'balance' ? 'bg-indigo-50 text-primary' : 'bg-white text-gray-600 border border-gray-200'} rounded hover:bg-indigo-100`}
+                                    className={`px-2 py-1 text-xs ${activeMonthlyTab === 'balance' ? 'bg-indigo-50 dark:bg-indigo-900 dark:bg-opacity-30 text-primary dark:text-indigo-400' : 'bg-white dark:bg-dark-300 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-dark-400'} rounded hover:bg-indigo-100 dark:hover:bg-dark-300`}
                                     onClick={() => setActiveMonthlyTab('balance')}
                                 >
                                     Saldo
@@ -859,18 +969,18 @@ const Reports = () => {
                     </div>
 
                     {/* Detailed transactions */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+                    <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 overflow-hidden mb-6 transition-theme">
                         {/* Table header */}
-                        <div className="px-6 py-4 border-b flex flex-col md:flex-row justify-between items-start md:items-center">
-                            <h3 className="font-semibold text-gray-800 mb-2 md:mb-0">Transações Detalhadas</h3>
+                        <div className="px-6 py-4 border-b border-gray-100 dark:border-dark-300 flex flex-col md:flex-row justify-between items-start md:items-center">
+                            <h3 className="font-semibold text-gray-800 dark:text-white mb-2 md:mb-0">Transações Detalhadas</h3>
                             <div className="flex space-x-2">
-                                <select className="border border-gray-300 rounded-lg px-3 py-1 bg-gray-50 text-sm focus:ring-primary focus:border-primary">
+                                <select className="border border-gray-300 dark:border-dark-400 rounded-lg px-3 py-1 bg-gray-50 dark:bg-dark-300 text-sm text-gray-800 dark:text-white focus:ring-primary dark:focus:ring-indigo-600 focus:border-primary dark:focus:border-indigo-500 transition-theme">
                                     <option>Todas as categorias</option>
                                     {categories.map((category, index) => (
                                         <option key={index} value={category.name}>{category.name}</option>
                                     ))}
                                 </select>
-                                <select className="border border-gray-300 rounded-lg px-3 py-1 bg-gray-50 text-sm focus:ring-primary focus:border-primary">
+                                <select className="border border-gray-300 dark:border-dark-400 rounded-lg px-3 py-1 bg-gray-50 dark:bg-dark-300 text-sm text-gray-800 dark:text-white focus:ring-primary dark:focus:ring-indigo-600 focus:border-primary dark:focus:border-indigo-500 transition-theme">
                                     <option>Todos os tipos</option>
                                     <option>Receitas</option>
                                     <option>Despesas</option>
@@ -879,54 +989,56 @@ const Reports = () => {
                         </div>
                         
                         {/* Table content */}
-                        <div className="divide-y divide-gray-100 overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
+                        <div className="divide-y divide-gray-100 dark:divide-dark-300 overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-300">
+                                <thead className="bg-gray-50 dark:bg-dark-300">
                                     <tr>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conta</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Data</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Descrição</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Categoria</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Conta</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Valor</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ações</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
+                                <tbody className="bg-white dark:bg-dark-200 divide-y divide-gray-200 dark:divide-dark-300">
                                     {filterTransactionsByPeriod(transactions, selectedPeriod).map((transaction, index) => (
-                                        <tr key={index} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                                        <tr key={index} className="hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                {formatDate(transaction.date)}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center">
-                                                    <div className={`${transaction.type === 'income' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'} p-2 rounded-lg mr-3`}>
+                                                    <div className={`${transaction.type === 'income' ? 'bg-green-100 dark:bg-green-900 dark:bg-opacity-30 text-green-600 dark:text-green-400' : 'bg-red-100 dark:bg-red-900 dark:bg-opacity-30 text-red-600 dark:text-red-400'} p-2 rounded-lg mr-3`}>
                                                         <i className={`fas ${transaction.type === 'income' ? 'fa-money-bill-wave' : 'fa-shopping-bag'} text-sm`}></i>
                                                     </div>
                                                     <div>
-                                                        <div className="font-medium text-gray-900">{transaction.description}</div>
-                                                        <div className="text-xs text-gray-500">{transaction.notes || '-'}</div>
+                                                        <div className="font-medium text-gray-900 dark:text-white">{transaction.description}</div>
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400">{transaction.notes || '-'}</div>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`px-2 py-1 text-xs ${transaction.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} rounded-full`}>
+                                                <span className={`px-2 py-1 text-xs ${transaction.type === 'income' ? 'bg-green-100 dark:bg-green-900 dark:bg-opacity-30 text-green-800 dark:text-green-300' : 'bg-red-100 dark:bg-red-900 dark:bg-opacity-30 text-red-800 dark:text-red-300'} rounded-full`}>
                                                     {transaction.category || 'Sem categoria'}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                                 {transaction.account || 'Não especificada'}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
+                                                <span className={transaction.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
                                                     {transaction.type === 'income' ? '' : '- '}
-                                                    {formatCurrency(transaction.amount)}
+                                                    {showBalance 
+                                                        ? formatCurrency(transaction.amount)
+                                                        : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <button className="text-gray-400 hover:text-gray-600 mr-2">
+                                                <button className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 mr-2 transition-colors">
                                                     <i className="fas fa-edit"></i>
                                                 </button>
-                                                <button className="text-gray-400 hover:text-gray-600">
+                                                <button className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors">
                                                     <i className="fas fa-trash"></i>
                                                 </button>
                                             </td>
@@ -935,7 +1047,7 @@ const Reports = () => {
                                     
                                     {filterTransactionsByPeriod(transactions, selectedPeriod).length === 0 && (
                                         <tr>
-                                            <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                                            <td colSpan="6" className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                                                 Nenhuma transação encontrada para o período selecionado.
                                             </td>
                                         </tr>
@@ -945,16 +1057,16 @@ const Reports = () => {
                         </div>
                         
                         {/* Table footer */}
-                        <div className="px-6 py-4 border-t flex flex-col md:flex-row justify-between items-center">
-                            <div className="text-sm text-gray-500 mb-2 md:mb-0">
-                                Mostrando <span className="font-medium">1</span> a <span className="font-medium">{filterTransactionsByPeriod(transactions, selectedPeriod).length}</span> de <span className="font-medium">{filterTransactionsByPeriod(transactions, selectedPeriod).length}</span> transações
+                        <div className="px-6 py-4 border-t border-gray-100 dark:border-dark-300 flex flex-col md:flex-row justify-between items-center">
+                            <div className="text-sm text-gray-500 dark:text-gray-400 mb-2 md:mb-0">
+                                Mostrando <span className="font-medium text-gray-700 dark:text-gray-300">1</span> a <span className="font-medium text-gray-700 dark:text-gray-300">{filterTransactionsByPeriod(transactions, selectedPeriod).length}</span> de <span className="font-medium text-gray-700 dark:text-gray-300">{filterTransactionsByPeriod(transactions, selectedPeriod).length}</span> transações
                             </div>
                             <div className="flex space-x-1">
-                                <button className="px-3 py-1 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                                <button className="px-3 py-1 border border-gray-300 dark:border-dark-400 rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-dark-300 hover:bg-gray-50 dark:hover:bg-dark-400 transition-colors">
                                     <i className="fas fa-chevron-left"></i>
                                 </button>
-                                <button className="px-3 py-1 border border-primary rounded-lg text-white bg-primary hover:bg-indigo-700">1</button>
-                                <button className="px-3 py-1 border border-gray-300 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                                <button className="px-3 py-1 border border-primary dark:border-indigo-700 rounded-lg text-white bg-primary dark:bg-indigo-700 hover:bg-indigo-700 dark:hover:bg-indigo-800 transition-colors">1</button>
+                                <button className="px-3 py-1 border border-gray-300 dark:border-dark-400 rounded-lg text-gray-700 dark:text-gray-300 bg-white dark:bg-dark-300 hover:bg-gray-50 dark:hover:bg-dark-400 transition-colors">
                                     <i className="fas fa-chevron-right"></i>
                                 </button>
                             </div>
@@ -964,10 +1076,10 @@ const Reports = () => {
                     {/* Budget vs Actual */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Budget status */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 p-4 transition-theme">
                             <div className="flex justify-between items-center mb-4">
-                                <h3 className="font-semibold text-gray-800">Status do Orçamento</h3>
-                                <button className="text-gray-400 hover:text-gray-600">
+                                <h3 className="font-semibold text-gray-800 dark:text-white">Status do Orçamento</h3>
+                                <button className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                                     <i className="fas fa-ellipsis-v"></i>
                                 </button>
                             </div>
@@ -976,27 +1088,46 @@ const Reports = () => {
                                     chartData.budgetStatus.map((budget, index) => (
                                         <div key={index}>
                                             <div className="flex justify-between text-sm mb-1">
-                                                <span className="text-gray-600">{budget.category}</span>
-                                                <span className="font-medium">
-                                                    {formatCurrency(budget.spent)} / {formatCurrency(budget.budgetAmount)}
+                                                <span className="text-gray-600 dark:text-gray-300">
+                                                    {budget.category}
+                                                    <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
+                                                        budget.budgetType === 'income' 
+                                                        ? 'bg-green-100 dark:bg-green-900 dark:bg-opacity-30 text-green-800 dark:text-green-300' 
+                                                        : 'bg-red-100 dark:bg-red-900 dark:bg-opacity-30 text-red-800 dark:text-red-300'
+                                                    }`}>
+                                                        {budget.budgetType === 'income' ? 'Receita' : 'Despesa'}
+                                                    </span>
+                                                </span>
+                                                <span className="font-medium text-gray-800 dark:text-white">
+                                                    {showBalance 
+                                                        ? `${formatCurrency(budget.spent)} / ${formatCurrency(budget.budgetAmount)}`
+                                                        : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
                                                 </span>
                                             </div>
-                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div className="w-full bg-gray-200 dark:bg-dark-300 rounded-full h-2">
                                                 <div 
                                                     className={`rounded-full h-2 ${
-                                                        budget.percentage >= 100 ? 'bg-red-500' : 
-                                                        budget.percentage >= 85 ? 'bg-yellow-500' : 
-                                                        'bg-green-500'}`} 
+                                                        budget.budgetType === 'income'
+                                                            ? 'bg-green-500 dark:bg-green-600' // Sempre verde para receitas
+                                                            : budget.percentage >= 100 
+                                                                ? 'bg-red-500 dark:bg-red-600' 
+                                                                : budget.percentage >= 85 
+                                                                    ? 'bg-yellow-500 dark:bg-yellow-600' 
+                                                                    : 'bg-green-500 dark:bg-green-600'}`} 
                                                     style={{width: `${Math.min(100, budget.percentage)}%`}}
                                                 ></div>
                                             </div>
-                                            <div className="text-xs text-gray-500 mt-1">
-                                                Restante: {formatCurrency(budget.remaining)} ({Math.round(100 - budget.percentage)}%)
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                {budget.budgetType === 'income' ? 'Pendente: ' : 'Restante: '}
+                                                {showBalance 
+                                                    ? formatCurrency(budget.remaining)
+                                                    : <span className="text-gray-400 dark:text-gray-500">•••••</span>} 
+                                                ({Math.round(100 - budget.percentage)}%)
                                             </div>
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-center text-gray-500 py-4">
+                                    <p className="text-center text-gray-500 dark:text-gray-400 py-4">
                                         Nenhum orçamento definido. Adicione orçamentos para acompanhar seus gastos.
                                     </p>
                                 )}
@@ -1004,10 +1135,10 @@ const Reports = () => {
                         </div>
                         
                         {/* Savings rate */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 p-4 transition-theme">
                             <div className="flex justify-between items-center mb-4">
-                                <h3 className="font-semibold text-gray-800">Taxa de Poupança</h3>
-                                <button className="text-gray-400 hover:text-gray-600">
+                                <h3 className="font-semibold text-gray-800 dark:text-white">Taxa de Poupança</h3>
+                                <button className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                                     <i className="fas fa-ellipsis-v"></i>
                                 </button>
                             </div>

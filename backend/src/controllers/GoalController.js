@@ -4,10 +4,13 @@ const Category = require('../models/Category');
 // Criar uma nova meta
 exports.createGoal = async (req, res) => {
   try {
-    // Garantir que o tipo seja 'goal'
+    const userId = req.user.id;  // Obtém o ID do usuário a partir do token JWT
+    
+    // Garantir que o tipo seja 'goal' e incluir o userId
     const goalData = {
       ...req.body,
-      type: 'goal'
+      type: 'goal',
+      userId: userId
     };
     
     const goal = await Budget.create(goalData);
@@ -17,11 +20,16 @@ exports.createGoal = async (req, res) => {
   }
 };
 
-// Obter todas as metas
+// Obter todas as metas do usuário atual
 exports.getAllGoals = async (req, res) => {
   try {
+    const userId = req.user.id;  // Obtém o ID do usuário a partir do token JWT
+    
     const goals = await Budget.findAll({
-      where: { type: 'goal' },
+      where: { 
+        type: 'goal',
+        userId: userId
+      },
       include: [{ model: Category, attributes: ['id', 'name', 'color'] }]
     });
     res.status(200).json(goals);
@@ -30,13 +38,16 @@ exports.getAllGoals = async (req, res) => {
   }
 };
 
-// Obter meta por ID
+// Obter meta por ID (somente se pertencer ao usuário atual)
 exports.getGoalById = async (req, res) => {
   try {
+    const userId = req.user.id;  // Obtém o ID do usuário a partir do token JWT
+    
     const goal = await Budget.findOne({
       where: { 
         id: req.params.id,
-        type: 'goal'
+        type: 'goal',
+        userId: userId
       },
       include: [{ model: Category, attributes: ['id', 'name', 'color'] }]
     });
@@ -51,14 +62,17 @@ exports.getGoalById = async (req, res) => {
   }
 };
 
-// Atualizar uma meta
+// Atualizar uma meta (somente se pertencer ao usuário atual)
 exports.updateGoal = async (req, res) => {
   try {
-    // Verificar se a meta existe e é do tipo 'goal'
+    const userId = req.user.id;  // Obtém o ID do usuário a partir do token JWT
+    
+    // Verificar se a meta existe e pertence ao usuário atual
     const goalExists = await Budget.findOne({
       where: { 
         id: req.params.id,
-        type: 'goal'
+        type: 'goal',
+        userId: userId
       }
     });
     
@@ -66,18 +80,25 @@ exports.updateGoal = async (req, res) => {
       return res.status(404).json({ message: 'Meta não encontrada' });
     }
     
-    // Garantir que o tipo permaneça como 'goal'
+    // Garantir que o tipo permaneça como 'goal' e o userId não seja alterado
     const goalData = {
       ...req.body,
-      type: 'goal'
+      type: 'goal',
+      // Não incluímos userId aqui para não permitir a alteração do proprietário
     };
     
     await Budget.update(goalData, {
-      where: { id: req.params.id }
+      where: { 
+        id: req.params.id,
+        userId: userId
+      }
     });
     
     const updatedGoal = await Budget.findOne({
-      where: { id: req.params.id },
+      where: { 
+        id: req.params.id,
+        userId: userId
+      },
       include: [{ model: Category, attributes: ['id', 'name', 'color'] }]
     });
     
@@ -87,13 +108,16 @@ exports.updateGoal = async (req, res) => {
   }
 };
 
-// Excluir uma meta
+// Excluir uma meta (somente se pertencer ao usuário atual)
 exports.deleteGoal = async (req, res) => {
   try {
+    const userId = req.user.id;  // Obtém o ID do usuário a partir do token JWT
+    
     const deleted = await Budget.destroy({
       where: { 
         id: req.params.id,
-        type: 'goal'
+        type: 'goal',
+        userId: userId
       }
     });
     

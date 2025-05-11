@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getTransactions, getAccounts, getBudgets, getCategories, getContributions } from '../services/api';
+import { getTransactions, createTransaction, getAccounts, getBudgets, getCategories, getContributions } from '../services/api';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import MobileSidebar from './layout/MobileSidebar';
@@ -9,6 +9,7 @@ import CategoriesChart from './dashBoard/CategoriesChart';
 import TransactionList from './transactions/TransactionList';
 import BudgetList from './budgets/BudgetList';
 import TransactionModal from './modals/TransactionModal';
+import { useUserSettingsContext } from '../contexts/UserSettingsContext';
 
 const Dashboard = () => {
   // Estados
@@ -32,6 +33,17 @@ const Dashboard = () => {
     expenseProgress: 0,
     savingsRate: 0 // Nova propriedade para taxa de poupança
   });
+  
+  // Obter configurações do contexto de usuário
+  const { settings, formatCurrency, formatDate, showBalance } = useUserSettingsContext();
+  
+  // Renderização condicional para valores monetários
+  const renderCurrency = (value) => {
+    if (!showBalance) {
+      return <span className="text-gray-400 dark:text-gray-500">•••••</span>;
+    }
+    return formatCurrency(value);
+  };
   
   // Buscar dados quando o componente montar ou o mês selecionado mudar
   useEffect(() => {
@@ -208,17 +220,6 @@ const Dashboard = () => {
     setSelectedMonth(new Date(parseInt(year), parseInt(month) - 1, 1));
   };
   
-  // Função para formatar valores monetários
-  const formatCurrency = (value) => {
-    if (typeof value !== 'number') {
-      value = parseFloat(value) || 0;
-    }
-    return `R$ ${value.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })}`;
-  };
-  
   // Função para adicionar uma nova transação
   const handleAddTransaction = async (formData) => {
     try {
@@ -316,9 +317,10 @@ const Dashboard = () => {
         income: dayIncome,
         expense: dayExpense,
         balance: dayBalance,
-        formattedIncome: formatCurrency(dayIncome),
-        formattedExpense: formatCurrency(dayExpense),
-        formattedBalance: formatCurrency(dayBalance)
+        // Usar a função formatCurrency do contexto
+        formattedIncome: showBalance ? formatCurrency(dayIncome) : '•••••',
+        formattedExpense: showBalance ? formatCurrency(dayExpense) : '•••••',
+        formattedBalance: showBalance ? formatCurrency(dayBalance) : '•••••'
       });
     }
     
@@ -363,9 +365,10 @@ const Dashboard = () => {
         name,
         value,
         color,
-        formattedValue: formatCurrency(value),
-        percentage: percentage.toFixed(1),
-        formattedPercentage: `${percentage.toFixed(1)}%`
+        // Usar a função formatCurrency do contexto
+        formattedValue: showBalance ? formatCurrency(value) : '•••••',
+        percentage: percentage.toFixed(2),  // Alterado para 2 casas decimais
+        formattedPercentage: `${percentage.toFixed(2)}%`  // Alterado para 2 casas decimais
       };
     });
     
@@ -412,8 +415,9 @@ const Dashboard = () => {
           accountName: account?.name || 'Conta não encontrada',
           categoryName: category?.name || tx.category || 'Sem categoria',
           categoryColor: category?.color || getCategoryDefaultColor(tx.category || 'Outros'),
-          formattedAmount: formatCurrency(tx.amount),
-          formattedDate: new Date(tx.date).toLocaleDateString('pt-BR')
+          // Usar a função formatCurrency do contexto
+          formattedAmount: showBalance ? formatCurrency(tx.amount) : '•••••',
+          formattedDate: formatDate(tx.date)
         };
       }),
       
@@ -434,8 +438,9 @@ const Dashboard = () => {
           accountName: account?.name || 'Conta não encontrada',
           categoryName: 'Metas',
           categoryColor: getCategoryDefaultColor('Metas'),
-          formattedAmount: formatCurrency(contrib.amount),
-          formattedDate: new Date(contrib.date).toLocaleDateString('pt-BR')
+          // Usar a função formatCurrency do contexto
+          formattedAmount: showBalance ? formatCurrency(contrib.amount) : '•••••',
+          formattedDate: formatDate(contrib.date)
         };
       })
     ];
@@ -449,8 +454,18 @@ const Dashboard = () => {
   const chartData = getChartData();
   const recentTransactions = getRecentTransactions();
   
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-dark-100">
+        <div className="spinner-border text-primary dark:text-indigo-400" role="status">
+          <span className="sr-only">Carregando...</span>
+        </div>
+      </div>
+    );
+  }
+  
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 dark:bg-dark-100 min-h-screen transition-theme">
       <Sidebar />
       <Header onMenuClick={() => setMobileMenuOpen(true)} />
       <MobileSidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
@@ -460,13 +475,13 @@ const Dashboard = () => {
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">Visão Geral</h2>
-              <p className="text-gray-600">Resumo completo das suas finanças pessoais</p>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Visão Geral</h2>
+              <p className="text-gray-600 dark:text-gray-300">Resumo completo das suas finanças pessoais</p>
             </div>
             <div className="mt-4 md:mt-0">
               <div className="relative">
                 <select 
-                  className="appearance-none bg-white border border-gray-300 rounded-lg pl-4 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="appearance-none bg-white dark:bg-dark-300 border border-gray-300 dark:border-dark-400 rounded-lg pl-4 pr-8 py-2 text-sm text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-indigo-600 focus:border-transparent transition-theme"
                   onChange={handleMonthChange}
                   value={`${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}`}
                 >
@@ -476,7 +491,7 @@ const Dashboard = () => {
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
                   <i className="fas fa-chevron-down text-xs"></i>
                 </div>
               </div>
@@ -487,18 +502,18 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <SummaryCard
               title="Saldo Total"
-              amount={formatCurrency(summary.totalBalance)}
+              amount={renderCurrency(summary.totalBalance)}
               icon="fa-wallet"
               color="text-indigo-600"
               details={
                 <div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Receitas</span>
-                    <span className="text-green-600 font-medium">+ {formatCurrency(summary.totalIncome)}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Receitas</span>
+                    <span className="text-green-600 dark:text-green-400 font-medium">+ {renderCurrency(summary.totalIncome)}</span>
                   </div>
                   <div className="flex justify-between text-sm mt-1">
-                    <span className="text-gray-500">Despesas</span>
-                    <span className="text-red-600 font-medium">- {formatCurrency(summary.totalExpense)}</span>
+                    <span className="text-gray-500 dark:text-gray-400">Despesas</span>
+                    <span className="text-red-600 dark:text-red-400 font-medium">- {renderCurrency(summary.totalExpense)}</span>
                   </div>
                 </div>
               }
@@ -506,18 +521,18 @@ const Dashboard = () => {
             
             <SummaryCard
               title="Receitas"
-              amount={formatCurrency(summary.totalIncome)}
+              amount={renderCurrency(summary.totalIncome)}
               icon="fa-arrow-up"
               color="text-green-600"
               details={
                 <div className="flex items-center">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-gray-200 dark:bg-dark-400 rounded-full h-2">
                     <div 
-                      className="bg-green-500 h-2 rounded-full" 
+                      className="bg-green-500 dark:bg-green-600 h-2 rounded-full" 
                       style={{ width: `${Math.min(summary.incomeProgress, 100)}%` }}
                     ></div>
                   </div>
-                  <span className="text-xs text-gray-500 ml-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                     {summary.incomeProgress.toFixed(1)}% da meta
                   </span>
                 </div>
@@ -526,22 +541,22 @@ const Dashboard = () => {
             
             <SummaryCard
               title="Despesas"
-              amount={formatCurrency(summary.totalExpense)}
+              amount={renderCurrency(summary.totalExpense)}
               icon="fa-arrow-down"
               color="text-red-600"
               details={
                 <div className="flex items-center">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-gray-200 dark:bg-dark-400 rounded-full h-2">
                     <div 
                       className={`h-2 rounded-full ${
-                        summary.expenseProgress > 100 ? 'bg-red-500' : 
-                        summary.expenseProgress > 80 ? 'bg-yellow-500' : 
-                        'bg-red-500'
+                        summary.expenseProgress > 100 ? 'bg-red-500 dark:bg-red-600' : 
+                        summary.expenseProgress > 80 ? 'bg-yellow-500 dark:bg-yellow-600' : 
+                        'bg-red-500 dark:bg-red-600'
                       }`}
                       style={{ width: `${Math.min(summary.expenseProgress, 100)}%` }}
                     ></div>
                   </div>
-                  <span className="text-xs text-gray-500 ml-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                     {summary.expenseProgress.toFixed(1)}% do orçamento
                   </span>
                 </div>
@@ -550,30 +565,30 @@ const Dashboard = () => {
           </div>
 
           {/* Taxa de poupança e estatísticas adicionais */}
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
+          <div className="bg-white dark:bg-dark-200 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 mb-6 transition-theme">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-gray-800">Taxa de Poupança</h3>
+              <h3 className="font-semibold text-gray-800 dark:text-white">Taxa de Poupança</h3>
               <span className={`px-2 py-1 text-xs rounded-full ${
-                summary.savingsRate > 30 ? 'bg-green-100 text-green-800' :
-                summary.savingsRate > 10 ? 'bg-blue-100 text-blue-800' :
-                'bg-red-100 text-red-800'
+                summary.savingsRate > 30 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:bg-opacity-20 dark:text-green-400' :
+                summary.savingsRate > 10 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:bg-opacity-20 dark:text-blue-400' :
+                'bg-red-100 text-red-800 dark:bg-red-900 dark:bg-opacity-20 dark:text-red-400'
               }`}>
                 {summary.savingsRate.toFixed(1)}%
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+            <div className="w-full bg-gray-200 dark:bg-dark-400 rounded-full h-2 mb-2">
               <div 
                 className={`rounded-full h-2 ${
-                  summary.savingsRate > 30 ? 'bg-green-500' :
-                  summary.savingsRate > 10 ? 'bg-blue-500' :
-                  'bg-red-500'
+                  summary.savingsRate > 30 ? 'bg-green-500 dark:bg-green-600' :
+                  summary.savingsRate > 10 ? 'bg-blue-500 dark:bg-blue-600' :
+                  'bg-red-500 dark:bg-red-600'
                 }`}
                 style={{ width: `${Math.min(Math.max(summary.savingsRate, 0), 100)}%` }}
               ></div>
             </div>
-            <div className="flex text-xs text-gray-500 justify-between">
+            <div className="flex text-xs text-gray-500 dark:text-gray-400 justify-between">
               <span>0%</span>
-              <span className="text-blue-600 font-medium">Meta: 20%</span>
+              <span className="text-blue-600 dark:text-blue-400 font-medium">Meta: 20%</span>
               <span>50%</span>
             </div>
           </div>
@@ -582,12 +597,18 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             {/* Gráfico de Receitas vs Despesas */}
             <div className="lg:col-span-2">
-              <IncomeExpenseChart data={chartData.incomeExpense} />
+              <IncomeExpenseChart 
+                data={chartData.incomeExpense}
+                showBalance={showBalance} 
+              />
             </div>
             
             {/* Gráfico de Categorias */}
             <div className="lg:col-span-1">
-              <CategoriesChart data={chartData.categories} />
+              <CategoriesChart 
+                data={chartData.categories}
+                showBalance={showBalance}
+              />
             </div>
           </div>
 
@@ -600,6 +621,7 @@ const Dashboard = () => {
                 onAddClick={() => setTransactionModalOpen(true)} 
                 accounts={accounts}
                 categories={categories}
+                showBalance={showBalance}
               />
             </div>
             
@@ -610,6 +632,8 @@ const Dashboard = () => {
                 transactions={transactions} 
                 selectedMonth={selectedMonth}
                 contributions={contributions}
+                formatCurrency={formatCurrency}
+                showBalance={showBalance}
               />
             </div>
           </div>
@@ -622,6 +646,8 @@ const Dashboard = () => {
         onSubmit={handleAddTransaction}
         accounts={accounts}
         categories={categories}
+        formatCurrency={formatCurrency}
+        formatDate={formatDate}
       />
     </div>
   );

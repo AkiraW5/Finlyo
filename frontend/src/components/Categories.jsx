@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getCategories, createCategory, updateCategory, deleteCategory, getTransactions } from '../services/api';
+import { useUserSettingsContext } from '../contexts/UserSettingsContext';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import MobileSidebar from './layout/MobileSidebar';
@@ -17,6 +18,14 @@ const Categories = () => {
     const [recentTransactions, setRecentTransactions] = useState([]);
     const [activeDropdown, setActiveDropdown] = useState(null);
     const [monthlyCategoryAmounts, setMonthlyCategoryAmounts] = useState({});
+    
+    // Obter preferências do usuário através do contexto
+    const { 
+        settings, 
+        formatCurrency, 
+        formatDate, 
+        showBalance 
+    } = useUserSettingsContext();
 
     useEffect(() => {
         fetchCategories();
@@ -234,24 +243,25 @@ const Categories = () => {
         
         return iconMap[category.name] || iconMap[category] || 'tag';
     };
-
-    // Formatar valor monetário
-    const formatCurrency = (value) => {
-        // Garantir que o valor seja um número
-        if (typeof value !== 'number') {
-            value = parseFloat(value) || 0;
-        }
-        return `R$ ${value.toFixed(2).replace('.', ',')}`;
-    };
     
     // Obter classe de fundo para categoria
     const getCategoryBgClass = (type) => {
         return type === 'income' ? 'income-bg' : 'expense-bg';
     };
 
+    // Renderização condicional para exibir valores
+    const renderAmount = (amount) => {
+        // Se usuário não quer ver valores
+        if (!showBalance) {
+            return <span className="privacy-mask">•••••</span>;
+        }
+        
+        return formatCurrency(amount);
+    };
+
     if (loading) {
         return (
-            <div className="flex justify-center items-center h-screen">
+            <div className="flex justify-center items-center h-screen bg-gray-50 dark:bg-dark-100">
                 <div className="spinner-border text-primary" role="status">
                     <span className="sr-only">Carregando...</span>
                 </div>
@@ -260,7 +270,7 @@ const Categories = () => {
     }
 
     return (
-        <div className="bg-gray-50 min-h-screen">
+        <div className="bg-gray-50 dark:bg-dark-100 min-h-screen">
             <Sidebar />
             <Header title="Categorias" onMenuClick={() => setMobileMenuOpen(true)} />
             <MobileSidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
@@ -270,13 +280,13 @@ const Categories = () => {
                     {/* Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-800">Categorias</h2>
-                            <p className="text-gray-600">Organize suas receitas e despesas por categorias</p>
+                            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Categorias</h2>
+                            <p className="text-gray-600 dark:text-gray-300">Organize suas receitas e despesas por categorias</p>
                         </div>
                         <div className="mt-4 md:mt-0 flex space-x-3">
                             <button 
                                 onClick={() => {setEditingCategory(null); setCategoryModalOpen(true);}}
-                                className="bg-primary hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center"
+                                className="btn btn-primary"
                             >
                                 <i className="fas fa-plus mr-2"></i>
                                 <span>Nova Categoria</span>
@@ -285,13 +295,13 @@ const Categories = () => {
                     </div>
 
                     {/* Tabs */}
-                    <div className="flex border-b border-gray-200 mb-6">
+                    <div className="flex border-b border-gray-200 dark:border-dark-300 mb-6">
                         <button 
                             onClick={() => setActiveTab('expense')}
                             className={`px-4 py-2 font-medium text-sm border-b-2 ${
                                 activeTab === 'expense' 
-                                    ? 'border-red-500 text-red-600' 
-                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    ? 'border-red-500 text-red-600 dark:text-red-400' 
+                                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                             }`}
                         >
                             Despesas
@@ -300,8 +310,8 @@ const Categories = () => {
                             onClick={() => setActiveTab('income')}
                             className={`px-4 py-2 font-medium text-sm border-b-2 ${
                                 activeTab === 'income' 
-                                    ? 'border-green-500 text-green-600' 
-                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    ? 'border-green-500 text-green-600 dark:text-green-400' 
+                                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                             }`}
                         >
                             Receitas
@@ -312,58 +322,66 @@ const Categories = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
                         {filteredCategories.length > 0 ? (
                             filteredCategories.map(category => (
-                                <div key={category.id} className="category-card bg-white border border-gray-200 rounded-xl p-5 transition-all duration-200 cursor-pointer">
+                                <div key={category.id} className="card transition-theme">
                                     <div className="flex justify-between items-start mb-4">
-                                        <div className={`category-icon ${activeTab === 'expense' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                        <div className={`${
+                                            activeTab === 'expense' 
+                                                ? 'bg-red-100 dark:bg-red-900 dark:bg-opacity-30 text-red-600 dark:text-red-400' 
+                                                : 'bg-green-100 dark:bg-green-900 dark:bg-opacity-30 text-green-600 dark:text-green-400'
+                                            } p-3 rounded-lg`}>
                                             <i className={`fas fa-${getCategoryIcon(category)}`}></i>
                                         </div>
                                         <div className="dropdown relative">
                                             <button 
-                                                className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none"
                                                 onClick={(e) => {
-                                                    e.stopPropagation(); // Evita que o evento de clique propague
+                                                    e.stopPropagation();
                                                     toggleDropdown(category.id);
                                                 }}
                                             >
                                                 <i className="fas fa-ellipsis-v"></i>
                                             </button>
-                                            <div className={`dropdown-menu absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg z-10 ${activeDropdown === category.id ? 'block' : 'hidden'}`}>
+                                            <div className={`dropdown-menu absolute right-0 mt-2 w-40 bg-white dark:bg-dark-200 rounded-md shadow-lg z-10 ${activeDropdown === category.id ? 'block' : 'hidden'}`}>
                                                 <button 
                                                     onClick={() => handleEditCategory(category)}
-                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-300"
                                                 >
                                                     Editar
                                                 </button>
                                                 <a 
                                                     href={`/transactions?category=${category.id}`}
-                                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                    className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-300"
                                                 >
                                                     Transações
                                                 </a>
                                                 <button 
                                                     onClick={() => handleDeleteCategory(category.id)}
-                                                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                                                    className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-dark-300"
                                                 >
                                                     Excluir
                                                 </button>
                                             </div>
                                         </div>
                                     </div>
-                                    <h4 className="font-semibold text-gray-800 mb-1">{category.name}</h4>
-                                    <p className="text-sm text-gray-500 mb-4">{category.description || 'Sem descrição'}</p>
+                                    <h4 className="font-semibold text-gray-800 dark:text-white mb-1">{category.name}</h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{category.description || 'Sem descrição'}</p>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-gray-600 text-sm">
+                                        <span className="text-gray-600 dark:text-gray-400 text-sm">
                                             {category.type === 'expense' ? 'Gasto mensal' : 'Rendimento mensal'}
                                         </span>
-                                        <span className={`font-semibold ${category.type === 'expense' ? 'text-red-600' : 'text-green-600'}`}>
-                                            {formatCurrency(getMonthlyCategoryAmount(category.name, category.type))}
+                                        <span className={`font-semibold ${
+                                            category.type === 'expense' 
+                                                ? 'text-red-600 dark:text-red-400' 
+                                                : 'text-green-600 dark:text-green-400'
+                                        }`}>
+                                            {renderAmount(getMonthlyCategoryAmount(category.name, category.type))}
                                         </span>
                                     </div>
                                 </div>
                             ))
                         ) : (
-                            <div className="col-span-full py-8 text-center text-gray-500">
-                                <i className="fas fa-tags text-gray-300 text-5xl mb-4"></i>
+                            <div className="col-span-full py-8 text-center text-gray-500 dark:text-gray-400">
+                                <i className="fas fa-tags text-gray-300 dark:text-gray-600 text-5xl mb-4"></i>
                                 <p>Nenhuma categoria de {activeTab === 'expense' ? 'despesa' : 'receita'} encontrada.</p>
                             </div>
                         )}
@@ -371,57 +389,65 @@ const Categories = () => {
                         {/* Add new category card */}
                         <div 
                             onClick={() => {setEditingCategory(null); setCategoryModalOpen(true);}}
-                            className="flex items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-5 hover:border-primary hover:bg-indigo-50 transition-all duration-200 cursor-pointer"
+                            className="flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-dark-300 rounded-xl p-5 hover:border-primary dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900 dark:hover:bg-opacity-20 transition-all duration-200 cursor-pointer"
                         >
                             <div className="text-center">
-                                <div className="mx-auto bg-indigo-100 w-12 h-12 rounded-full flex items-center justify-center mb-3">
-                                    <i className="fas fa-plus text-primary text-xl"></i>
+                                <div className="mx-auto bg-indigo-100 dark:bg-indigo-900 dark:bg-opacity-50 w-12 h-12 rounded-full flex items-center justify-center mb-3">
+                                    <i className="fas fa-plus text-primary dark:text-indigo-400 text-xl"></i>
                                 </div>
-                                <h4 className="font-semibold text-gray-800">Nova categoria</h4>
+                                <h4 className="font-semibold text-gray-800 dark:text-white">Nova categoria</h4>
                             </div>
                         </div>
                     </div>
 
-                    {/* Recent transactions by category - Now showing real data */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    {/* Recent transactions by category */}
+                    <div className="panel">
                         {/* Table header */}
-                        <div className="px-6 py-4 border-b flex flex-col md:flex-row justify-between items-start md:items-center">
-                            <h3 className="font-semibold text-gray-800 mb-2 md:mb-0">
+                        <div className="panel-header">
+                            <h3 className="font-semibold text-gray-800 dark:text-white mb-2 md:mb-0">
                                 Transações Recentes - {activeTab === 'expense' ? 'Despesas' : 'Receitas'}
                             </h3>
-                            <a href="/transactions" className="text-primary hover:text-indigo-700 text-sm font-medium">Ver todas</a>
+                            <a href="/transactions" className="text-primary dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-sm font-medium">Ver todas</a>
                         </div>
                         
                         {/* Table content */}
-                        <div className="divide-y divide-gray-100">
+                        <div className="divide-y divide-gray-100 dark:divide-dark-300">
                             {recentTransactions.length > 0 ? (
                                 recentTransactions.map(transaction => (
-                                    <div key={transaction.id} className="hover:bg-gray-50">
+                                    <div key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-dark-300 transition-theme">
                                         <div className="px-6 py-4 flex items-center justify-between">
                                             <div className="flex items-center">
-                                                <div className={`${transaction.type === 'expense' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} p-3 rounded-lg mr-4`}>
+                                                <div className={`${
+                                                    transaction.type === 'expense' 
+                                                        ? 'bg-red-100 dark:bg-red-900 dark:bg-opacity-30 text-red-600 dark:text-red-400' 
+                                                        : 'bg-green-100 dark:bg-green-900 dark:bg-opacity-30 text-green-600 dark:text-green-400'
+                                                    } p-3 rounded-lg mr-4`}>
                                                     <i className={`fas fa-${getCategoryIcon(transaction.category)}`}></i>
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-medium">{transaction.description}</h4>
-                                                    <p className="text-sm text-gray-500">
-                                                        {transaction.category} • {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                                                    <h4 className="font-medium dark:text-white">{transaction.description}</h4>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                        {transaction.category} • {formatDate(transaction.date)}
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className={`font-medium ${transaction.type === 'expense' ? 'text-red-600' : 'text-green-600'}`}>
+                                                <p className={`font-medium ${
+                                                    transaction.type === 'expense' 
+                                                        ? 'text-red-600 dark:text-red-400' 
+                                                        : 'text-green-600 dark:text-green-400'
+                                                }`}>
                                                     {transaction.type === 'expense' ? '- ' : '+ '}
-                                                    {formatCurrency(transaction.amount)}
+                                                    {renderAmount(transaction.amount)}
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
                                 ))
                             ) : (
-                                <div className="px-6 py-8 text-center text-gray-500">
+                                <div className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                     <p>Nenhuma transação recente encontrada.</p>
-                                    <a href="/transactions" className="text-primary hover:underline mt-2 inline-block">
+                                    <a href="/transactions" className="text-primary dark:text-indigo-400 hover:underline mt-2 inline-block">
                                         Adicionar uma transação
                                     </a>
                                 </div>

@@ -2,6 +2,7 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 const Budget = require('./Budget');
 const Account = require('./Account');
+const User = require('./User');
 
 const Contribution = sequelize.define('Contribution', {
   id: {
@@ -34,6 +35,14 @@ const Contribution = sequelize.define('Contribution', {
       key: 'id'
     }
   },
+  userId: {  // Adicionando campo para referência ao usuário
+    type: DataTypes.INTEGER,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    allowNull: false
+  },
   notes: {
     type: DataTypes.TEXT,
     allowNull: true
@@ -48,8 +57,9 @@ const Contribution = sequelize.define('Contribution', {
   timestamps: true
 });
 
-// Definir associações diretamente
+// Definir associações
 Contribution.belongsTo(Budget, { foreignKey: 'budgetId' });
 Contribution.belongsTo(Account, { foreignKey: 'accountId' });
+Contribution.belongsTo(User, { foreignKey: 'userId' });  // Adicionar associação com usuário
 
 module.exports = Contribution;

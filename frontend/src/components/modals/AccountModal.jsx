@@ -5,20 +5,29 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
   const [name, setName] = useState('');
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
-  const [balance, setBalance] = useState('');
-  const [creditLimit, setCreditLimit] = useState('');
+  const [balance, setBalance] = useState('0,00');  // Inicializado com formato de moeda
+  const [creditLimit, setCreditLimit] = useState('0,00');  // Inicializado com formato de moeda
   const [color, setColor] = useState('indigo');
   const [notes, setNotes] = useState('');
 
   // Carregar dados quando estiver editando uma conta existente
   useEffect(() => {
     if (account) {
+      // Formatar valores numéricos para exibição
+      const formattedBalance = account.balance ? 
+        (parseFloat(account.balance)).toFixed(2).replace('.', ',') : 
+        '0,00';
+      
+      const formattedCreditLimit = account.creditLimit ? 
+        (parseFloat(account.creditLimit)).toFixed(2).replace('.', ',') : 
+        '0,00';
+      
       setAccountType(account.type || '');
       setName(account.name || '');
       setBankName(account.bankName || '');
       setAccountNumber(account.accountNumber || '');
-      setBalance(account.balance ? account.balance.toString() : '');
-      setCreditLimit(account.creditLimit ? account.creditLimit.toString() : '');
+      setBalance(formattedBalance);
+      setCreditLimit(formattedCreditLimit);
       setColor(account.color || 'indigo');
       setNotes(account.notes || '');
     } else {
@@ -31,17 +40,39 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
     setName('');
     setBankName('');
     setAccountNumber('');
-    setBalance('');
-    setCreditLimit('');
+    setBalance('0,00');  // Valor formatado
+    setCreditLimit('0,00');  // Valor formatado
     setColor('indigo');
     setNotes('');
+  };
+
+  // Função para formatar valores monetários
+  const formatCurrency = (value) => {
+    // Remove todos os caracteres não numéricos
+    const digitsOnly = value.replace(/\D/g, '');
+    
+    // Converte para centavos (inteiro)
+    const valueInCents = parseInt(digitsOnly || '0', 10);
+    
+    // Formata para o padrão brasileiro: 0,00
+    return (valueInCents / 100).toFixed(2).replace('.', ',');
+  };
+  
+  // Funções de manipulação de valores monetários
+  const handleBalanceChange = (e) => {
+    setBalance(formatCurrency(e.target.value));
+  };
+  
+  const handleCreditLimitChange = (e) => {
+    setCreditLimit(formatCurrency(e.target.value));
   };
   
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    const balanceValue = parseFloat(balance.replace(',', '.'));
-    const creditLimitValue = creditLimit ? parseFloat(creditLimit.replace(',', '.')) : 0;
+    // Converter valores formatados para números
+    const balanceValue = parseFloat(balance.replace(',', '.')) || 0;
+    const creditLimitValue = parseFloat(creditLimit.replace(',', '.')) || 0;
     
     const accountData = {
       type: accountType,
@@ -72,12 +103,12 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="text-lg font-semibold text-gray-800">
+      <div className="bg-white dark:bg-dark-200 rounded-xl shadow-xl w-full max-w-md transition-theme">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-300">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
             {account ? 'Editar Conta' : 'Adicionar Nova Conta'}
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 transition-colors">
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -86,9 +117,9 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
             <div className="grid grid-cols-1 gap-4">
               {/* Account type */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Conta</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Conta</label>
                 <select 
-                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring-primary" 
+                  className="block w-full rounded-lg border-gray-300 dark:border-dark-400 bg-white dark:bg-dark-300 text-gray-800 dark:text-white shadow-sm focus:border-primary focus:ring-primary dark:focus:ring-indigo-600 transition-theme" 
                   value={accountType}
                   onChange={(e) => setAccountType(e.target.value)}
                   required
@@ -105,10 +136,10 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
               
               {/* Account name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Conta</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome da Conta</label>
                 <input 
                   type="text" 
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-primary focus:border-primary" 
+                  className="block w-full px-3 py-2 border border-gray-300 dark:border-dark-400 rounded-lg bg-gray-50 dark:bg-dark-300 text-gray-800 dark:text-white focus:ring-primary focus:border-primary dark:focus:ring-indigo-600 transition-theme" 
                   placeholder="Ex: Conta Nubank" 
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -119,10 +150,10 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
               {/* Bank name */}
               {shouldShowBankField && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Banco</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Banco</label>
                   <input 
                     type="text" 
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-primary focus:border-primary" 
+                    className="block w-full px-3 py-2 border border-gray-300 dark:border-dark-400 rounded-lg bg-gray-50 dark:bg-dark-300 text-gray-800 dark:text-white focus:ring-primary focus:border-primary dark:focus:ring-indigo-600 transition-theme" 
                     placeholder="Ex: Banco Itaú"
                     value={bankName}
                     onChange={(e) => setBankName(e.target.value)}
@@ -133,10 +164,10 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
               {/* Account number */}
               {shouldShowAccountNumberField && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Número da Conta</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Número da Conta</label>
                   <input 
                     type="text" 
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-primary focus:border-primary" 
+                    className="block w-full px-3 py-2 border border-gray-300 dark:border-dark-400 rounded-lg bg-gray-50 dark:bg-dark-300 text-gray-800 dark:text-white focus:ring-primary focus:border-primary dark:focus:ring-indigo-600 transition-theme" 
                     placeholder="Ex: 12345-6"
                     value={accountNumber}
                     onChange={(e) => setAccountNumber(e.target.value)}
@@ -146,19 +177,20 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
               
               {/* Initial balance */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {accountType === 'credit' ? 'Valor da Fatura' : 'Saldo Inicial'}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500">R$</span>
+                    <span className="text-gray-500 dark:text-gray-400">R$</span>
                   </div>
                   <input 
                     type="text"
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-primary focus:border-primary" 
+                    inputMode="numeric"
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-400 rounded-lg bg-gray-50 dark:bg-dark-300 text-gray-800 dark:text-white focus:ring-primary focus:border-primary dark:focus:ring-indigo-600 transition-theme" 
                     placeholder="0,00"
                     value={balance}
-                    onChange={(e) => setBalance(e.target.value)}
+                    onChange={handleBalanceChange}
                     required 
                   />
                 </div>
@@ -167,17 +199,18 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
               {/* Credit limit */}
               {shouldShowCreditLimitField && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Limite do Cartão</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Limite do Cartão</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500">R$</span>
+                      <span className="text-gray-500 dark:text-gray-400">R$</span>
                     </div>
                     <input 
                       type="text"
-                      className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-primary focus:border-primary" 
+                      inputMode="numeric"
+                      className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-400 rounded-lg bg-gray-50 dark:bg-dark-300 text-gray-800 dark:text-white focus:ring-primary focus:border-primary dark:focus:ring-indigo-600 transition-theme" 
                       placeholder="0,00"
                       value={creditLimit}
-                      onChange={(e) => setCreditLimit(e.target.value)}
+                      onChange={handleCreditLimitChange}
                     />
                   </div>
                 </div>
@@ -185,13 +218,13 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
               
               {/* Color picker */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cor da Conta</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cor da Conta</label>
                 <div className="flex space-x-2">
                   {['indigo', 'green', 'red', 'blue', 'purple', 'yellow'].map(colorOption => (
                     <button
                       key={colorOption}
                       type="button"
-                      className={`w-8 h-8 rounded-full bg-${colorOption}-500 border-2 ${color === colorOption ? 'border-indigo-700' : 'border-transparent'} focus:outline-none`}
+                      className={`w-8 h-8 rounded-full bg-${colorOption}-500 dark:bg-${colorOption}-600 border-2 ${color === colorOption ? 'border-indigo-700 dark:border-indigo-400' : 'border-transparent'} focus:outline-none transition-theme`}
                       onClick={() => setColor(colorOption)}
                     ></button>
                   ))}
@@ -200,10 +233,10 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
               
               {/* Notes */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notas (Opcional)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notas (Opcional)</label>
                 <textarea 
                   rows="2" 
-                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring-primary" 
+                  className="block w-full rounded-lg border-gray-300 dark:border-dark-400 bg-white dark:bg-dark-300 text-gray-800 dark:text-white shadow-sm focus:border-primary focus:ring-primary dark:focus:ring-indigo-600 transition-theme" 
                   placeholder="Detalhes adicionais sobre esta conta..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -215,13 +248,13 @@ const AccountModal = ({ isOpen, onClose, onSubmit, account = null }) => {
               <button 
                 type="button" 
                 onClick={handleCancel}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 dark:border-dark-400 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-300 transition-colors"
               >
                 Cancelar
               </button>
               <button 
                 type="submit" 
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-indigo-700"
+                className="px-4 py-2 bg-primary dark:bg-indigo-700 text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-800 transition-colors"
               >
                 {account ? 'Salvar Alterações' : 'Salvar Conta'}
               </button>

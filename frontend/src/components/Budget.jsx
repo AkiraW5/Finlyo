@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getBudgets, getTransactions, getCategories, createBudget, updateBudget, deleteBudget } from '../services/api';
+import { useUserSettingsContext } from '../contexts/UserSettingsContext';
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import MobileSidebar from './layout/MobileSidebar';
@@ -16,6 +17,7 @@ const Budget = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [showBudgetForm, setShowBudgetForm] = useState(false);
   const [editingBudget, setEditingBudget] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null); 
   const [budgetSummary, setBudgetSummary] = useState({
     totalBudgetedExpense: 0,
     totalSpentExpense: 0,
@@ -27,11 +29,58 @@ const Budget = () => {
     categoriesOverBudget: 0,
     categoriesUnderBudget: 0
   });
+  
+  // Obter preferências do usuário através do contexto
+  const { 
+    settings, 
+    formatCurrency, 
+    formatDate, 
+    showBalance 
+  } = useUserSettingsContext();
 
   // Buscar dados quando o componente montar ou o mês selecionado mudar
   useEffect(() => {
+    fetchUserData();
     fetchData();
   }, [selectedMonth]);
+
+  // Buscar dados do usuário atual
+  const fetchUserData = async () => {
+    try {
+      // Decodificar o token JWT para obter informações do usuário
+      const userId = getCurrentUserId();
+      if (userId) {
+        setCurrentUser({ id: userId });
+      } else {
+        console.error("Não foi possível obter o ID do usuário");
+        showNotification('Erro de autenticação. Faça login novamente.', 'error');
+        // Redirecionar para login após alguns segundos
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 3000);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar dados do usuário:", error);
+    }
+  };
+
+  const getCurrentUserId = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    
+    try {
+      // Extrair o payload do token JWT
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(window.atob(base64));
+      
+      // O payload deve conter o ID do usuário
+      return payload.id || payload.userId || null;
+    } catch (error) {
+      console.error("Erro ao decodificar token:", error);
+      return null;
+    }
+  };
 
   // Função para buscar todos os dados necessários
   const fetchData = async () => {
@@ -39,9 +88,9 @@ const Budget = () => {
       setLoading(true);
       
       const [budgetsData, transactionsData, categoriesData] = await Promise.all([
-        getBudgets(),
-        getTransactions(),
-        getCategories()
+        getBudgets(), // O backend deve filtrar pelo userId no token JWT
+        getTransactions(), // O backend deve filtrar pelo userId no token JWT
+        getCategories() // O backend deve filtrar pelo userId no token JWT
       ]);
       
       // Filtrar apenas orçamentos (excluir metas)
@@ -56,7 +105,18 @@ const Budget = () => {
       
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
-      showNotification('Erro ao carregar dados de orçamento', 'error');
+      
+      // Verificar se é um erro de autenticação
+      if (error.response && error.response.status === 401) {
+        showNotification('Sessão expirada. Por favor, faça login novamente.', 'error');
+        // Redirecionar para a página de login
+        setTimeout(() => {
+          localStorage.removeItem('token'); // Limpar token inválido
+          window.location.href = '/login';
+        }, 2000);
+      } else {
+        showNotification('Erro ao carregar dados de orçamento', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -148,12 +208,20 @@ const Budget = () => {
       // Buscar o nome da categoria a partir do ID
       const category = categories.find(c => c.id === parseInt(formData.categoryId));
       
+      // Incluir o userId no budgetData
+      const userId = getCurrentUserId();
+      if (!userId) {
+        showNotification('Erro de autenticação. Por favor, faça login novamente.', 'error');
+        return;
+      }
+      
       // Incluir todos os campos obrigatórios
       const budgetData = {
         ...formData,
-        category: category ? category.name : 'Categoria', // Adicionar o nome da categoria
-        type: formData.type || 'expense', // Preservar o tipo selecionado ou usar 'expense' como padrão
-        period: 'monthly'
+        category: category ? category.name : 'Categoria', 
+        type: formData.type || 'expense',
+        period: 'monthly',
+        userId: userId // Incluir o userId
       };
       
       if (editingBudget && editingBudget.id) {
@@ -226,15 +294,14 @@ const Budget = () => {
     return options;
   };
 
-  // Função para formatar valores monetários
-  const formatCurrency = (value) => {
-    if (typeof value !== 'number') {
-      value = parseFloat(value) || 0;
+  // Renderização condicional para exibir valores
+  const renderAmount = (amount) => {
+    // Se usuário não quer ver valores
+    if (!showBalance) {
+      return <span className="font-semibold text-gray-400 dark:text-gray-500">•••••</span>;
     }
-    return `R$ ${value.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })}`;
+    
+    return formatCurrency(amount);
   };
 
   // Processar orçamentos com gastos
@@ -339,9 +406,9 @@ const Budget = () => {
   const processedBudgets = getBudgetsWithData();
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 dark:bg-dark-100 min-h-screen transition-theme">
       <Sidebar />
-      <Header onMenuClick={() => setMobileMenuOpen(true)} />
+      <Header onMenuClick={() => setMobileMenuOpen(true)} title="Orçamentos" />
       <MobileSidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
       
       <div className="md:ml-64">
@@ -349,13 +416,13 @@ const Budget = () => {
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">Orçamentos</h2>
-              <p className="text-gray-600">Gerencie seus limites de gastos e receitas por categoria</p>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Orçamentos</h2>
+              <p className="text-gray-600 dark:text-gray-300">Gerencie seus limites de gastos e receitas por categoria</p>
             </div>
             <div className="flex items-center space-x-2 mt-4 md:mt-0">
               <div className="relative">
                 <select 
-                  className="appearance-none bg-white border border-gray-300 rounded-lg pl-4 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="appearance-none bg-white dark:bg-dark-200 border border-gray-300 dark:border-dark-300 rounded-lg pl-4 pr-8 py-2 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                   onChange={handleMonthChange}
                   value={`${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}`}
                 >
@@ -365,7 +432,7 @@ const Budget = () => {
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-400">
                   <i className="fas fa-chevron-down text-xs"></i>
                 </div>
               </div>
@@ -375,7 +442,7 @@ const Budget = () => {
                     setEditingBudget({type: 'expense'});
                     setShowBudgetForm(true);
                   }}
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm flex items-center"
+                  className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-4 py-2 rounded-lg text-sm flex items-center transition-colors"
                 >
                   <i className="fas fa-minus-circle mr-2"></i>
                   <span>Nova Despesa</span>
@@ -386,7 +453,7 @@ const Budget = () => {
                     setEditingBudget({type: 'income'});
                     setShowBudgetForm(true);
                   }}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm flex items-center"
+                  className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white px-4 py-2 rounded-lg text-sm flex items-center transition-colors"
                 >
                   <i className="fas fa-plus-circle mr-2"></i>
                   <span>Nova Receita</span>
@@ -396,40 +463,44 @@ const Budget = () => {
           </div>
 
           {/* Resumo do Orçamento */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+          <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 p-4 mb-6 transition-theme">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Despesas */}
-              <div className="border-b md:border-b-0 md:border-r border-gray-200 pb-4 md:pb-0 md:pr-4">
+              <div className="border-b md:border-b-0 md:border-r border-gray-200 dark:border-dark-300 pb-4 md:pb-0 md:pr-4">
                 <div className="flex flex-col">
-                  <h3 className="font-semibold text-gray-800 mb-3">Despesas</h3>
+                  <h3 className="font-semibold text-gray-800 dark:text-white mb-3">Despesas</h3>
                   <div className="flex items-end">
-                    <span className="text-2xl font-bold text-gray-900">
-                      {formatCurrency(budgetSummary.totalBudgetedExpense)}
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {showBalance 
+                        ? formatCurrency(budgetSummary.totalBudgetedExpense)
+                        : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
                     </span>
-                    <span className="text-gray-500 ml-2 mb-1">orçado</span>
+                    <span className="text-gray-500 dark:text-gray-400 ml-2 mb-1">orçado</span>
                   </div>
                   <div className="flex items-end mt-2">
                     <span className={`font-semibold ${
                       budgetSummary.totalSpentExpense > budgetSummary.totalBudgetedExpense 
-                        ? 'text-red-600' 
-                        : 'text-green-600'
+                        ? 'text-red-600 dark:text-red-400' 
+                        : 'text-green-600 dark:text-green-400'
                     }`}>
-                      {formatCurrency(budgetSummary.totalSpentExpense)}
+                      {showBalance 
+                        ? formatCurrency(budgetSummary.totalSpentExpense)
+                        : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
                     </span>
-                    <span className="text-gray-500 text-sm ml-2">gasto</span>
+                    <span className="text-gray-500 dark:text-gray-400 text-sm ml-2">gasto</span>
                   </div>
                   <div className="mt-3">
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div className="w-full bg-gray-200 dark:bg-dark-300 rounded-full h-2.5">
                       <div 
                         className={`h-2.5 rounded-full ${
-                          budgetSummary.percentageUsedExpense > 100 ? 'bg-red-600' : 
-                          budgetSummary.percentageUsedExpense > 90 ? 'bg-yellow-500' : 
-                          'bg-green-500'
+                          budgetSummary.percentageUsedExpense > 100 ? 'bg-red-600 dark:bg-red-500' : 
+                          budgetSummary.percentageUsedExpense > 90 ? 'bg-yellow-500 dark:bg-yellow-600' : 
+                          'bg-green-500 dark:bg-green-600'
                         }`}
                         style={{ width: `${Math.min(budgetSummary.percentageUsedExpense, 100)}%` }}
                       ></div>
                     </div>
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                       <span>0%</span>
                       <span>{budgetSummary.percentageUsedExpense.toFixed(1)}% utilizado</span>
                       <span>100%</span>
@@ -441,37 +512,41 @@ const Budget = () => {
               {/* Receitas */}
               <div className="pt-4 md:pt-0 md:pl-4">
                 <div className="flex flex-col">
-                  <h3 className="font-semibold text-gray-800 mb-3">Receitas</h3>
+                  <h3 className="font-semibold text-gray-800 dark:text-white mb-3">Receitas</h3>
                   <div className="flex items-end">
-                    <span className="text-2xl font-bold text-gray-900">
-                      {formatCurrency(budgetSummary.totalBudgetedIncome)}
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {showBalance 
+                        ? formatCurrency(budgetSummary.totalBudgetedIncome)
+                        : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
                     </span>
-                    <span className="text-gray-500 ml-2 mb-1">previsto</span>
+                    <span className="text-gray-500 dark:text-gray-400 ml-2 mb-1">previsto</span>
                   </div>
                   <div className="flex items-end mt-2">
                     <span className={`font-semibold ${
                       budgetSummary.totalReceivedIncome >= budgetSummary.totalBudgetedIncome 
-                        ? 'text-green-600' 
-                        : 'text-yellow-600'
+                        ? 'text-green-600 dark:text-green-400' 
+                        : 'text-yellow-600 dark:text-yellow-400'
                     }`}>
-                      {formatCurrency(budgetSummary.totalReceivedIncome)}
+                      {showBalance 
+                        ? formatCurrency(budgetSummary.totalReceivedIncome)
+                        : <span className="text-gray-400 dark:text-gray-500">•••••</span>}
                     </span>
-                    <span className="text-gray-500 text-sm ml-2">recebido</span>
+                    <span className="text-gray-500 dark:text-gray-400 text-sm ml-2">recebido</span>
                   </div>
                   <div className="mt-3">
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div className="w-full bg-gray-200 dark:bg-dark-300 rounded-full h-2.5">
                       <div 
                         className={`h-2.5 rounded-full ${
                           budgetSummary.percentageReceivedIncome >= 100 
-                            ? 'bg-green-500' 
+                            ? 'bg-green-500 dark:bg-green-600' 
                             : budgetSummary.percentageReceivedIncome < 85 
-                              ? 'bg-yellow-500' 
-                              : 'bg-green-500'
+                              ? 'bg-yellow-500 dark:bg-yellow-600' 
+                              : 'bg-green-500 dark:bg-green-600'
                         }`}
                         style={{ width: `${Math.min(budgetSummary.percentageReceivedIncome, 100)}%` }}
                       ></div>
                     </div>
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                       <span>0%</span>
                       <span>{budgetSummary.percentageReceivedIncome.toFixed(1)}% recebido</span>
                       <span>100%</span>
@@ -486,7 +561,7 @@ const Budget = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
             {loading ? (
               <div className="col-span-3 text-center py-10">
-                <div className="spinner-border text-primary" role="status">
+                <div className="spinner-border text-primary dark:text-indigo-400" role="status">
                   <span className="sr-only">Carregando...</span>
                 </div>
               </div>
@@ -497,15 +572,16 @@ const Budget = () => {
                   budget={budget}
                   onEdit={() => handleEditBudget(budget)}
                   onDelete={() => handleDeleteBudget(budget.id)}
+                  showBalance={showBalance}
                 />
               ))
             ) : (
-              <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-                <div className="text-gray-400 mb-3">
+              <div className="col-span-3 bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 p-8 text-center transition-theme">
+                <div className="text-gray-400 dark:text-gray-500 mb-3">
                   <i className="fas fa-calculator text-5xl"></i>
                 </div>
-                <h3 className="text-xl font-medium text-gray-800 mb-2">Nenhum orçamento definido</h3>
-                <p className="text-gray-500 mb-4">
+                <h3 className="text-xl font-medium text-gray-800 dark:text-white mb-2">Nenhum orçamento definido</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-4">
                   Crie orçamentos para controlar seus gastos e receitas por categoria.
                 </p>
                 <div className="flex justify-center space-x-3">
@@ -514,7 +590,7 @@ const Budget = () => {
                       setEditingBudget({type: 'expense'});
                       setShowBudgetForm(true);
                     }}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+                    className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-4 py-2 rounded-lg transition-colors"
                   >
                     Nova Despesa
                   </button>
@@ -523,7 +599,7 @@ const Budget = () => {
                       setEditingBudget({type: 'income'});
                       setShowBudgetForm(true);
                     }}
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+                    className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white px-4 py-2 rounded-lg transition-colors"
                   >
                     Nova Receita
                   </button>
@@ -534,13 +610,13 @@ const Budget = () => {
 
           {/* Categorias sem orçamento */}
           {getCategoriesWithoutBudget().length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
-              <h3 className="font-semibold text-gray-800 mb-4">Categorias sem orçamento</h3>
+            <div className="bg-white dark:bg-dark-200 rounded-xl shadow-sm border border-gray-100 dark:border-dark-300 p-4 mb-6 transition-theme">
+              <h3 className="font-semibold text-gray-800 dark:text-white mb-4">Categorias sem orçamento</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {getCategoriesWithoutBudget().map(category => (
                   <div 
                     key={category.id}
-                    className="border border-dashed border-gray-300 rounded-lg p-3 flex justify-between items-center hover:bg-gray-50 cursor-pointer"
+                    className="border border-dashed border-gray-300 dark:border-dark-300 rounded-lg p-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-dark-300 cursor-pointer transition-colors"
                     onClick={() => {
                       setEditingBudget({
                         categoryId: category.id,
@@ -556,9 +632,9 @@ const Budget = () => {
                         className="w-3 h-3 rounded-full mr-2"
                         style={{ backgroundColor: category.color || '#94a3b8' }}
                       ></span>
-                      <span className="font-medium text-gray-700">{category.name}</span>
+                      <span className="font-medium text-gray-700 dark:text-gray-200">{category.name}</span>
                     </div>
-                    <i className="fas fa-plus-circle text-gray-400 hover:text-indigo-600"></i>
+                    <i className="fas fa-plus-circle text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"></i>
                   </div>
                 ))}
               </div>
@@ -578,6 +654,7 @@ const Budget = () => {
           onSubmit={handleSaveBudget}
           budget={editingBudget}
           categories={categories}
+          formatCurrency={formatCurrency}
         />
       )}
     </div>

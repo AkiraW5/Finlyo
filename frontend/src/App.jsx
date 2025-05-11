@@ -1,68 +1,65 @@
-import React from 'react';
-import { BrowserRouter as Router, Route, Switch, Redirect } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { UserSettingsProvider } from './contexts/UserSettingsContext';
+
+// Importação dos componentes de página
 import Dashboard from './components/Dashboard';
 import Transactions from './components/Transactions';
 import Accounts from './components/Accounts';
-import Goals from './components/Goal';
 import Categories from './components/Categories';
-import Reports from './components/Reports';
 import Budget from './components/Budget';
+import Goals from './components/Goal';
+import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import './styles/tailwind.css';
+import ForgotPassword from './components/auth/ForgotPassword';
+import ResetPassword from './components/auth/ResetPassword';
+import TestPage from './pages/TestPage';
 
-// Componente para proteger rotas
-const PrivateRoute = ({ component: Component, ...rest }) => {
+// Componente de rota privada
+const PrivateRoute = ({ children }) => {
   const { currentUser, loading } = useAuth();
   
-  return (
-    <Route
-      {...rest}
-      render={(props) => {
-        if (loading) {
-          return (
-            <div className="flex justify-center items-center h-screen">
-              <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
-            </div>
-          );
-        }
-        
-        return currentUser ? (
-          <Component {...props} />
-        ) : (
-          <Redirect to="/login" />
-        );
-      }}
-    />
-  );
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  return currentUser ? children : <Navigate to="/login" />;
 };
 
 function App() {
   return (
     <AuthProvider>
       <Router>
-        <Switch>
-          {/* Rotas públicas */}
-          <Route path="/login" component={Login} />
-          <Route path="/register" component={Register} />
-          
-          {/* Rotas privadas */}
-          <PrivateRoute exact path="/" component={Dashboard} />
-          <PrivateRoute path="/transactions" component={Transactions} />
-          <PrivateRoute path="/accounts" component={Accounts} />
-          <PrivateRoute path="/categories" component={Categories} />
-          <PrivateRoute path="/budget" component={Budget} />
-          <PrivateRoute path="/goals" component={Goals} />
-          <PrivateRoute path="/reports" component={Reports} />
-          <PrivateRoute path="/settings" component={Settings} />
-          
-          {/* Rota de fallback para página não encontrada */}
-          <Route path="*">
-            <Redirect to="/" />
-          </Route>
-        </Switch>
+        <UserSettingsProvider>
+          <Routes>
+            {/* Rotas públicas */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
+            <Route path="/system-tests" element={<TestPage />} />
+
+            {/* Rotas privadas */}
+            <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+            <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
+            <Route path="/accounts" element={<PrivateRoute><Accounts /></PrivateRoute>} />
+            <Route path="/categories" element={<PrivateRoute><Categories /></PrivateRoute>} />
+            <Route path="/budget" element={<PrivateRoute><Budget /></PrivateRoute>} />
+            <Route path="/goals" element={<PrivateRoute><Goals /></PrivateRoute>} />
+            <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
+            <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
+            
+            {/* Rota de fallback para página não encontrada */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </UserSettingsProvider>
       </Router>
     </AuthProvider>
   );

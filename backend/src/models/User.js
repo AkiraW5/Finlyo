@@ -15,22 +15,41 @@ const User = sequelize.define('User', {
   email: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
-    validate: {
-      isEmail: true
-    }
+    unique: true
+  },
+  phoneNumber: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
   },
   password: {
     type: DataTypes.STRING,
     allowNull: false
   },
   role: {
-    type: DataTypes.ENUM('admin', 'user'),
+    type: DataTypes.ENUM('user', 'admin'),
     defaultValue: 'user'
   },
   settings: {
     type: DataTypes.JSON,
-    defaultValue: {}
+    defaultValue: {
+      currency: 'BRL',
+      dateFormat: 'DD/MM/YYYY',
+      theme: 'light',
+      language: 'pt-BR',
+      showBalance: true,
+      hideAmounts: false,
+      emailNotifications: false,
+      budgetAlerts: true
+    }
+  },
+  resetPasswordToken: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  resetPasswordExpires: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 }, {
   tableName: 'users',

@@ -1,12 +1,17 @@
 const express = require('express');
 const router = express.Router();
+const authController = require('../controllers/authController');
+const passwordResetController = require('../controllers/passwordResetController');
 const userController = require('../controllers/userController');
 
-// Route for user registration
-router.post('/register', userController.register);
+// Rotas existentes
+router.post('/login', authController.login);
+router.post('/register', authController.register);
+router.get('/verify', authController.verify);
 
-// Route for user login
-router.post('/login', userController.login);
+// Novas rotas para recuperação de senha
+router.post('/forgot-password', passwordResetController.requestPasswordReset);
+router.post('/reset-password', passwordResetController.resetPassword);
 
 // Route for getting user information
 router.get('/me', userController.getUserInfo);

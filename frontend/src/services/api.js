@@ -349,7 +349,7 @@ export const createContribution = async (contributionData) => {
 // Função para obter configurações do usuário
 export const getUserSettings = async () => {
   try {
-    const response = await axios.get(`${API_URL}/settings`);
+    const response = await axios.get('/api/settings');
     return response.data;
   } catch (error) {
     console.error('Erro ao buscar configurações:', error);
@@ -361,11 +361,78 @@ export const getUserSettings = async () => {
 // Função para atualizar configurações do usuário
 export const updateUserSettings = async (settingsData) => {
   try {
-    const response = await axios.put(`${API_URL}/settings`, settingsData);
+    const response = await axios.put('/api/settings', settingsData);
     return response.data;
   } catch (error) {
     console.error('Erro ao atualizar configurações:', error);
-    throw new Error('Erro ao atualizar configurações: ' + error.message);
+    throw error;
   }
 };
 
+// Função para solicitar redefinição de senha (versão simplificada)
+export const requestPasswordReset = async (email) => {
+  try {
+    const response = await axios.post(`${API_URL}/auth/forgot-password`, { email });
+    return response.data;
+  } catch (error) {
+    throw new Error('Erro ao solicitar redefinição de senha: ' + error.message);
+  }
+};
+
+// Função para redefinir senha com token
+export const resetPassword = async (email, token, newPassword) => {
+  try {
+    const response = await axios.post(`${API_URL}/auth/reset-password`, { 
+      email,
+      token,
+      newPassword
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error('Erro ao redefinir senha: ' + error.message);
+  }
+};
+
+
+// Funções específicas para testes de carga do sistema
+export const loadTest = {
+  get: async (endpoint) => {
+    try {
+      const response = await axios.get(`${API_URL}/${endpoint}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erro no teste GET ${endpoint}:`, error);
+      throw error;
+    }
+  },
+  
+  post: async (endpoint, data) => {
+    try {
+      const response = await axios.post(`${API_URL}/${endpoint}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Erro no teste POST ${endpoint}:`, error);
+      throw error;
+    }
+  },
+  
+  put: async (endpoint, id, data) => {
+    try {
+      const response = await axios.put(`${API_URL}/${endpoint}/${id}`, data);
+      return response.data;
+    } catch (error) {
+      console.error(`Erro no teste PUT ${endpoint}/${id}:`, error);
+      throw error;
+    }
+  },
+  
+  delete: async (endpoint, id) => {
+    try {
+      const response = await axios.delete(`${API_URL}/${endpoint}/${id}`);
+      return true;
+    } catch (error) {
+      console.error(`Erro no teste DELETE ${endpoint}/${id}:`, error);
+      throw error;
+    }
+  }
+};

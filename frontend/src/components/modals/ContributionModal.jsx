@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 const ContributionModal = ({ isOpen, onClose, onSubmit, goals, selectedGoal, accounts = [] }) => {
   const [formData, setFormData] = useState({
     goalId: '',
-    amount: '',
-    accountId: '', // Inicializado corretamente
+    amount: '0,00',  // Inicializado com formato de moeda
+    accountId: '',
     date: new Date().toISOString().split('T')[0],
     method: 'deposit',
     notes: '',
@@ -21,17 +21,58 @@ const ContributionModal = ({ isOpen, onClose, onSubmit, goals, selectedGoal, acc
     }
   }, [selectedGoal]);
 
+  // Resetar o formulário quando o modal é aberto
+  useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        goalId: selectedGoal ? selectedGoal.id : '',
+        amount: '0,00',
+        accountId: '',
+        date: new Date().toISOString().split('T')[0],
+        method: 'deposit',
+        notes: '',
+        type: 'budget_contribution'
+      });
+    }
+  }, [isOpen, selectedGoal]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    if (name === 'amount') {
+      // Formatação especial para campo de valor monetário
+      // Remove caracteres não numéricos
+      const digitsOnly = value.replace(/\D/g, '');
+      
+      // Converte para centavos (inteiro)
+      const valueInCents = parseInt(digitsOnly || '0', 10);
+      
+      // Formata para o padrão brasileiro: 0,00
+      const formattedValue = (valueInCents / 100).toFixed(2).replace('.', ',');
+      
+      setFormData(prev => ({
+        ...prev,
+        [name]: formattedValue
+      }));
+    } else {
+      // Comportamento padrão para outros campos
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    
+    // Converter o valor formatado para número
+    const submissionData = {
+      ...formData,
+      amount: parseFloat(formData.amount.replace(',', '.')) || 0
+    };
+    
+    onSubmit(submissionData);
   };
 
   // Se o modal não estiver aberto, não renderize nada
@@ -76,7 +117,8 @@ const ContributionModal = ({ isOpen, onClose, onSubmit, goals, selectedGoal, acc
                     <span className="text-gray-500">R$</span>
                   </div>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     name="amount"
                     value={formData.amount}
                     onChange={handleChange}
