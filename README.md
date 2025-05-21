@@ -1,67 +1,168 @@
-# Controle Financeiro
+# Finlyo - Sistema de Gestão Financeira Pessoal
 
-Este projeto é uma aplicação de controle financeiro que permite aos usuários gerenciar suas finanças pessoais de forma eficiente. A aplicação é dividida em duas partes principais: o frontend e o backend.
+<div align="center">
+  <img src="frontend/finlyo-icon.png" alt="Finlyo Logo" width="200"/>
+  <br>
+  <h3>Controle suas finanças com simplicidade e eficiência</h3>
+</div>
 
-## Estrutura do Projeto
+![License](https://img.shields.io/badge/license-Custom--BY--NC--SA-blue.svg )
+![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
+![Node](https://img.shields.io/badge/node-v16+-blue.svg)
+![React](https://img.shields.io/badge/react-v18-blue.svg)
 
-- **frontend/**: Contém a interface do usuário da aplicação.
-  - **public/**: Arquivos públicos acessíveis, incluindo o HTML principal, CSS e JavaScript.
-    - **index.html**: Página principal da aplicação.
-    - **css/**: Contém os estilos CSS.
-    - **js/**: Contém a lógica JavaScript.
-  - **src/**: Contém os componentes React e serviços.
-    - **components/**: Componentes da interface do usuário, como Dashboard, Transactions, Budgets, Categories e Reports.
-    - **services/**: Serviços para interagir com a API do backend e gerenciar autenticação.
+## 📋 Visão Geral
 
-- **backend/**: Contém a lógica do servidor e a API.
-  - **src/**: Código-fonte do backend.
-    - **controllers/**: Controladores que gerenciam a lógica de negócios para usuários, transações, categorias e orçamentos.
-    - **models/**: Modelos de dados que definem a estrutura dos dados no banco de dados.
-    - **routes/**: Rotas que conectam as requisições HTTP aos controladores correspondentes.
-    - **middlewares/**: Middleware para autenticação e validação de dados.
-    - **config/**: Configurações do banco de dados e variáveis de ambiente.
-    - **app.js**: Ponto de entrada do backend, configurando o aplicativo Express.
+Finlyo é uma aplicação full-stack moderna para gestão financeira pessoal, desenvolvida com React no frontend e Node.js/Express no backend. O sistema permite aos usuários gerenciar transações, contas, orçamentos, metas financeiras e categorias, oferecendo uma solução completa para controle financeiro.
 
-## Instalação
+<div align="center">
+  <img src="https://i.imgur.com/LXjv5Dy.png" alt="Finlyo Dashboard Preview" width="80%"/>
+</div>
+
+## ✨ Funcionalidades
+
+- **Dashboard Intuitivo**: Visualização clara das finanças com gráficos e estatísticas
+- **Gestão de Transações**: Registro e categorização de receitas e despesas
+- **Múltiplas Contas**: Suporte a contas bancárias, cartões de crédito e investimentos
+- **Orçamentos Personalizados**: Definição de limites por categoria
+- **Metas Financeiras**: Acompanhamento de objetivos de economia
+- **Relatórios Detalhados**: Análise de gastos e tendências
+- **Autenticação Segura**: Sistema completo com JWT, recuperação de senha e perfis de usuário
+- **Design Responsivo**: Experiência otimizada em dispositivos móveis e desktop
+
+## 🔧 Tecnologias Utilizadas
+
+### Frontend
+- **React**: Biblioteca para construção de interfaces
+- **Context API**: Gerenciamento de estado
+- **React Router**: Navegação entre páginas
+- **Tailwind CSS**: Framework CSS para design responsivo
+- **Chart.js**: Visualização de dados em gráficos
+
+### Backend
+- **Node.js**: Ambiente de execução JavaScript
+- **Express**: Framework web para API RESTful
+- **Sequelize**: ORM para interação com banco de dados
+- **MySQL**: Banco de dados relacional
+- **JWT**: Autenticação e autorização
+- **Bcrypt**: Criptografia de senhas
+
+## 🏗️ Arquitetura
+
+O projeto segue uma arquitetura moderna de aplicação web:
+
+```
+finlyo/
+├── frontend/               # Aplicação React (SPA)
+│   ├── public/             # Arquivos estáticos
+│   └── src/                # Código-fonte React
+│       ├── components/     # Componentes reutilizáveis
+│       ├── contexts/       # Context API para gerenciamento de estado
+│       ├── pages/          # Páginas da aplicação
+│       └── services/       # Serviços para comunicação com API
+│
+├── backend/                # API RESTful em Node.js/Express
+│   ├── src/
+│   │   ├── controllers/    # Controladores para lógica de negócios
+│   │   ├── models/         # Modelos Sequelize
+│   │   ├── routes/         # Rotas da API
+│   │   ├── middlewares/    # Middlewares para autenticação e validação
+│   │   ├── config/         # Configurações do sistema
+│   │   └── app.js          # Configuração do Express
+│   └── server.js           # Ponto de entrada do servidor
+│
+└── docker-compose.yml      # Configuração para containerização
+```
+
+## 🚀 Instalação e Execução
+
+### Pré-requisitos
+- Node.js (v16 ou superior)
+- MySQL (v8 ou superior)
+- npm ou yarn
+
+### Configuração do Backend
 
 1. Clone o repositório:
-   ```
-   git clone <URL_DO_REPOSITORIO>
+   ```bash
+   git clone https://github.com/seu-usuario/finlyo.git
+   cd finlyo
    ```
 
-2. Navegue até o diretório do frontend e instale as dependências:
-   ```
-   cd controle-financeiro/frontend
+2. Configure o ambiente do backend:
+   ```bash
+   cd backend
    npm install
    ```
 
-3. Navegue até o diretório do backend e instale as dependências:
+3. Configure as variáveis de ambiente:
+   ```bash
+   cp .env.example .env
+   # Edite o arquivo .env com suas configurações
    ```
-   cd ../backend
+
+4. Inicie o servidor:
+   ```bash
+   npm start
+   ```
+
+### Configuração do Frontend
+
+1. Em um novo terminal, navegue até o diretório do frontend:
+   ```bash
+   cd frontend
    npm install
    ```
 
-4. Configure as variáveis de ambiente no arquivo `.env` no diretório do backend.
-
-5. Inicie o servidor backend:
-   ```
-   npm start
+2. Inicie a aplicação React:
+   ```bash
+   npm run dev
    ```
 
-6. Inicie o frontend:
+3. Acesse a aplicação em seu navegador:
    ```
-   cd ../frontend
-   npm start
+   http://localhost:3000
    ```
 
-## Uso
+### Usando Docker (Opcional)
 
-Após iniciar o servidor, você pode acessar a aplicação no navegador em `http://localhost:3000`. A partir daí, você pode registrar-se, fazer login e começar a gerenciar suas finanças.
+Para executar todo o ambiente com Docker:
 
-## Contribuição
+```bash
+docker-compose up -d
+```
 
-Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou pull requests.
+## 🛣️ Roadmap
 
-## Licença
+- [ ] Importação/exportação de dados
+- [x] Suporte a múltiplas moedas
+- [ ] Aplicativo móvel nativo
+- [ ] Integração com bancos via Open Banking
+- [x] Modo offline com sincronização
 
-Este projeto está licenciado sob a MIT License.
+## 🤝 Contribuição
+
+Contribuições são bem-vindas! Para contribuir:
+
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/nova-funcionalidade`)
+3. Faça commit das alterações (`git commit -m 'Adiciona nova funcionalidade'`)
+4. Faça push para a branch (`git push origin feature/nova-funcionalidade`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Este projeto está licenciado sob uma [Licença Personalizada](LICENSE.md).
+
+## 👨‍💻 Autor
+
+**Felipe Benedito Rodrigues**
+
+- GitHub: [@AkiraW5](https://github.com/AkiraW5)
+
+---
+
+<div align="center">
+  <p>⭐ Se este projeto foi útil para você, considere dar uma estrela! ⭐</p>
+  <p>Desenvolvido com ❤️ e ☕</p>
+</div>
