@@ -6,7 +6,7 @@
   <h3>Controle suas finanças com simplicidade e eficiência</h3>
 </div>
 
-![License](https://img.shields.io/badge/license-Custom--BY--NC--SA-blue.svg )
+![License](https://img.shields.io/badge/license-AGPL--3.0-blue)
 ![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
 ![Node](https://img.shields.io/badge/node-v16+-blue.svg)
 ![React](https://img.shields.io/badge/react-v18-blue.svg)
@@ -152,13 +152,7 @@ Contribuições são bem-vindas! Para contribuir:
 
 ## 📄 Licença
 
-Este projeto está licenciado sob uma [Licença Personalizada](LICENSE.md).
-
-## 👨‍💻 Autor
-
-**Felipe Benedito Rodrigues**
-
-- GitHub: [@AkiraW5](https://github.com/AkiraW5)
+Este projeto está licenciado sob uma [Licença AGPL 3.0](LICENSE.md).
 
 ---
 
